@@ -84,6 +84,7 @@
   .row label{width:54px;color:var(--muted);font-size:12px}
   .row input[type=number]{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:5px 7px;font-size:12px}
   .row input[type=range]{flex:1;accent-color:var(--accent)}
+  .row input[type=color]{flex:1;height:28px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:2px;cursor:pointer}
   .scale-val{width:48px;text-align:right;color:var(--text);font-size:12px}
   .btn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
   .btn-grid button{padding:6px 4px;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;cursor:pointer;font-size:11px}
@@ -169,10 +170,13 @@ const FX = [
   {k:'contrast',   label:'Contrast',  min:0, max:200, def:100, suffix:'%'},
   {k:'saturate',   label:'Saturate',  min:0, max:200, def:100, suffix:'%'},
   {k:'grayscale',  label:'Gray',      min:0, max:100, def:0,   suffix:'%'},
+  {k:'tint',       label:'Tint',      min:0, max:100, def:0,   suffix:'%'},
+  {k:'vignette',   label:'Vignette',  min:0, max:100, def:0,   suffix:'%'},
   {k:'darken',     label:'Darken',    min:0, max:100, def:0,   suffix:'%'},
   {k:'bottomShade',label:'Btm shade', min:0, max:100, def:0,   suffix:'%'},
 ];
-function defaultFx(){ const o={}; FX.forEach(f=>o[f.k]=f.def); return o; }
+function defaultFx(){ const o={tintColor:'#000000'}; FX.forEach(f=>o[f.k]=f.def); return o; }
+function hexA(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
 
 /* ---------- State ---------- */
 const IMG = {bg:null, logo:null};
@@ -259,24 +263,41 @@ function fitBg(c,mode){
   const f = mode==='cover' ? Math.max(c.w/IMG.bg.w,c.h/IMG.bg.h) : Math.min(c.w/IMG.bg.w,c.h/IMG.bg.h);
   s.bg.scale=f; s.bg.x=(c.w-IMG.bg.w*f)/2; s.bg.y=(c.h-IMG.bg.h*f)/2;
 }
+// keep the background fully covering the frame — never expose an empty edge
+function clampBg(c){
+  const s=ST[c.id]; if(!IMG.bg || c.logoOnly) return;
+  const cover=Math.max(c.w/IMG.bg.w, c.h/IMG.bg.h);
+  if(s.bg.scale < cover) s.bg.scale=cover;
+  const dw=IMG.bg.w*s.bg.scale, dh=IMG.bg.h*s.bg.scale;
+  s.bg.x = Math.min(0, Math.max(c.w-dw, s.bg.x));
+  s.bg.y = Math.min(0, Math.max(c.h-dh, s.bg.y));
+}
 
 /* ---------- Rendering ---------- */
 function render(c, g, sf, forExport){
-  g.clearRect(0,0,c.w*sf,c.h*sf);
+  const W=g.canvas.width, H=g.canvas.height; // fill the full buffer, never leave gaps
+  g.clearRect(0,0,W,H);
   const opaque = !c.transparent || (forExport && fmt==='jpg');
-  if(opaque){ g.fillStyle='#000'; g.fillRect(0,0,c.w*sf,c.h*sf); }
+  if(opaque){ g.fillStyle='#000'; g.fillRect(0,0,W,H); }
   if(IMG.bg && !c.logoOnly){
     ensureBgInit(c); const b=ST[c.id].bg, fx=ST[c.id].fx; g.imageSmoothingQuality='high';
     g.filter=`blur(${(fx.blur*sf).toFixed(2)}px) brightness(${fx.brightness}%) contrast(${fx.contrast}%) saturate(${fx.saturate}%) grayscale(${fx.grayscale}%)`;
     const bleed=fx.blur>0 ? fx.blur*3*sf : 0; // push blur fade past the canvas edge
     g.drawImage(IMG.bg.img, b.x*sf-bleed, b.y*sf-bleed, IMG.bg.w*b.scale*sf+2*bleed, IMG.bg.h*b.scale*sf+2*bleed);
     g.filter='none';
-    if(fx.darken>0){ g.fillStyle=`rgba(0,0,0,${fx.darken/100})`; g.fillRect(0,0,c.w*sf,c.h*sf); }
+    if(fx.tint>0){ g.fillStyle=hexA(fx.tintColor,fx.tint/100); g.fillRect(0,0,W,H); }
+    if(fx.darken>0){ g.fillStyle=`rgba(0,0,0,${fx.darken/100})`; g.fillRect(0,0,W,H); }
     if(fx.bottomShade>0){
-      const grad=g.createLinearGradient(0,0,0,c.h*sf);
+      const grad=g.createLinearGradient(0,0,0,H);
       grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(0.5,'rgba(0,0,0,0)');
       grad.addColorStop(1,`rgba(0,0,0,${fx.bottomShade/100})`);
-      g.fillStyle=grad; g.fillRect(0,0,c.w*sf,c.h*sf);
+      g.fillStyle=grad; g.fillRect(0,0,W,H);
+    }
+    if(fx.vignette>0){
+      const cx=W/2, cy=H/2, r=Math.hypot(W,H)/2;
+      const grad=g.createRadialGradient(cx,cy,r*0.45,cx,cy,r);
+      grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(1,`rgba(0,0,0,${fx.vignette/100})`);
+      g.fillStyle=grad; g.fillRect(0,0,W,H);
     }
   }
   const s=ST[c.id];
@@ -323,7 +344,9 @@ stage.addEventListener('pointermove',e=>{
   if(!drag)return;
   const l=activeLayerState();
   l.x+=(e.clientX-drag.x)/drag.sf; l.y+=(e.clientY-drag.y)/drag.sf;
-  drag.x=e.clientX; drag.y=e.clientY; drawStage();
+  drag.x=e.clientX; drag.y=e.clientY;
+  if(activeLayer==='bg') clampBg(CAPSULES.find(x=>x.id===activeId));
+  drawStage();
 });
 stage.addEventListener('pointerup',()=>{drag=null;stage.classList.remove('dragging');syncControls();});
 stage.addEventListener('wheel',e=>{
@@ -332,6 +355,7 @@ stage.addEventListener('wheel',e=>{
   const factor=e.deltaY<0?1.06:1/1.06, cx=c.w/2, cy=c.h/2;
   const px=(cx-l.x)/l.scale, py=(cy-l.y)/l.scale;
   l.scale*=factor; l.x=cx-px*l.scale; l.y=cy-py*l.scale;
+  if(activeLayer==='bg') clampBg(c);
   drawStage(); syncControls();
 },{passive:false});
 
@@ -377,8 +401,7 @@ function buildControls(){
     <div class="section">
       <h4>Background fit</h4>
       <div class="btn-grid">
-        <button id="bgCover" ${hasBg?'':'disabled'}>Fill</button>
-        <button id="bgContain" ${hasBg?'':'disabled'}>Fit</button>
+        <button id="bgCover" ${hasBg?'':'disabled'}>Fill frame</button>
         <button id="bgReset" ${hasBg?'':'disabled'}>Reset</button>
       </div>
     </div>
@@ -386,6 +409,7 @@ function buildControls(){
     <div class="section">
       <h4>Background effects</h4>
       ${FX.map(f=>`<div class="row"><label>${f.label}</label><input type="range" class="fxR" data-k="${f.k}" min="${f.min}" max="${f.max}" step="1"/><span class="scale-val" id="fxv_${f.k}"></span></div>`).join('')}
+      <div class="row"><label>Tint col</label><input type="color" id="tintCol"/><span class="scale-val"></span></div>
       <div class="btn-grid">
         <button id="fxReset">Reset fx</button>
         <button id="fxAll">Apply to all</button>
@@ -413,8 +437,7 @@ function buildControls(){
   const inc=$('#incLogo');
   if(inc) inc.addEventListener('change',()=>{ s.includeLogo=inc.checked; if(!inc.checked&&activeLayer==='logo')activeLayer='bg'; refreshAll(); });
   const wire=(id,fn)=>{const el=$(id);if(el)el.addEventListener('click',fn);};
-  wire('#bgCover',()=>{fitBg(c,'cover');drawStage();syncControls();});
-  wire('#bgContain',()=>{fitBg(c,'contain');drawStage();syncControls();});
+  wire('#bgCover',()=>{fitBg(c,'cover');clampBg(c);drawStage();syncControls();});
   wire('#bgReset',()=>{s.bg.init=false;ensureBgInit(c);drawStage();syncControls();});
   controls.querySelectorAll('[data-a]').forEach(b=>b.addEventListener('click',()=>{
     if(!IMG.logo||logoForbidden){toast('No logo to anchor');return;}
@@ -426,6 +449,8 @@ function buildControls(){
     r.value=s.fx[k]; const v=$('#fxv_'+k); v.textContent=s.fx[k]+f.suffix;
     r.addEventListener('input',()=>{ s.fx[k]=parseInt(r.value,10); v.textContent=r.value+f.suffix; drawStage(); });
   });
+  const tc=$('#tintCol');
+  if(tc){ tc.value=s.fx.tintColor; tc.addEventListener('input',()=>{ s.fx.tintColor=tc.value; if(s.fx.tint===0){s.fx.tint=40; const tr=controls.querySelector('.fxR[data-k=tint]'); if(tr){tr.value=40; $('#fxv_tint').textContent='40%';}} drawStage(); }); }
   wire('#fxReset',()=>{ s.fx=defaultFx(); buildControls(); drawStage(); });
   wire('#fxAll',()=>{ CAPSULES.forEach(x=>{ ST[x.id].fx={...s.fx}; }); toast('Effects applied to all capsules'); });
   wire('#dlOne',()=>downloadOne(c));
@@ -451,10 +476,11 @@ function buildLayerControls(){
     const c2=CAPSULES.find(x=>x.id===activeId), ns=Math.max(0.02,scR.value/100);
     const cx=c2.w/2,cy=c2.h/2,px=(cx-l.x)/l.scale,py=(cy-l.y)/l.scale;
     l.scale=ns; l.x=cx-px*ns; l.y=cy-py*ns;
-    scV.textContent=Math.round(ns*100)+'%'; xN.value=Math.round(l.x); yN.value=Math.round(l.y); drawStage();
+    if(activeLayer==='bg'){ clampBg(c2); set(); } else { scV.textContent=Math.round(ns*100)+'%'; xN.value=Math.round(l.x); yN.value=Math.round(l.y); }
+    drawStage();
   });
-  xN.addEventListener('input',()=>{l.x=parseFloat(xN.value)||0;drawStage();});
-  yN.addEventListener('input',()=>{l.y=parseFloat(yN.value)||0;drawStage();});
+  xN.addEventListener('input',()=>{l.x=parseFloat(xN.value)||0; if(activeLayer==='bg')clampBg(c); drawStage();});
+  yN.addEventListener('input',()=>{l.y=parseFloat(yN.value)||0; if(activeLayer==='bg')clampBg(c); drawStage();});
   host._set=set;
 }
 function syncControls(){ const h=$('#layerCtl'); if(h&&h._set)h._set(); }
