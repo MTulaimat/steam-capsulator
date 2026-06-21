@@ -86,6 +86,8 @@
   .row input[type=number]{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:5px 7px;font-size:12px}
   .row input[type=range]{flex:1;accent-color:var(--accent)}
   .row input[type=color]{flex:1;height:28px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:2px;cursor:pointer}
+  .fxRst{flex:0 0 auto;width:24px;height:24px;padding:0;background:var(--panel);border:1px solid var(--line);color:var(--muted);border-radius:4px;cursor:pointer;font-size:13px;line-height:1}
+  .fxRst:hover{border-color:var(--accent);color:#fff}
   .scale-val{width:48px;text-align:right;color:var(--text);font-size:12px}
   .btn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
   .btn-grid button{padding:6px 4px;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;cursor:pointer;font-size:11px}
@@ -433,8 +435,8 @@ function buildControls(){
     ${hasBg?`
     <div class="section">
       <h4>Background effects</h4>
-      ${FX.map(f=>`<div class="row"><label>${f.label}</label><input type="range" class="fxR" data-k="${f.k}" min="${f.min}" max="${f.max}" step="1"/><span class="scale-val" id="fxv_${f.k}"></span></div>`).join('')}
-      <div class="row"><label>Tint col</label><input type="color" id="tintCol"/><span class="scale-val"></span></div>
+      ${FX.map(f=>`<div class="row"><label>${f.label}</label><input type="range" class="fxR" data-k="${f.k}" min="${f.min}" max="${f.max}" step="1"/><span class="scale-val" id="fxv_${f.k}"></span><button class="fxRst" data-k="${f.k}" title="Reset ${f.label}">↺</button></div>`).join('')}
+      <div class="row"><label>Tint col</label><input type="color" id="tintCol"/><span class="scale-val"></span><button class="fxRst" data-k="tintColor" title="Reset tint colour">↺</button></div>
       <div class="btn-grid">
         <button id="fxReset">Reset</button>
         <button id="fxAll">Apply to all</button>
@@ -477,9 +479,17 @@ function buildControls(){
   });
   const tc=$('#tintCol');
   if(tc){ tc.value=s.fx.tintColor; tc.addEventListener('input',()=>{ s.fx.tintColor=tc.value; if(s.fx.tint===0){s.fx.tint=40; const tr=controls.querySelector('.fxR[data-k=tint]'); if(tr){tr.value=40; $('#fxv_tint').textContent='40%';}} drawStage(); }); }
+  controls.querySelectorAll('.fxRst').forEach(b=>b.addEventListener('click',()=>{
+    const k=b.dataset.k, def=defaultFx()[k];
+    s.fx[k]=def;
+    if(k==='tintColor'){ if(tc)tc.value=def; }
+    else{ const r=controls.querySelector('.fxR[data-k="'+k+'"]'), f=FX.find(x=>x.k===k);
+      if(r){ r.value=def; $('#fxv_'+k).textContent=def+f.suffix; } }
+    drawStage();
+  }));
   wire('#fxReset',()=>{ s.fx=defaultFx(); buildControls(); drawStage(); });
-  wire('#fxAll',()=>{ CAPSULES.forEach(x=>{ ST[x.id].fx={...s.fx}; }); toast('Effects applied to all capsules'); });
-  wire('#fxResetAll',()=>{ CAPSULES.forEach(x=>{ ST[x.id].fx=defaultFx(); }); buildControls(); drawStage(); toast('Effects reset on all capsules'); });
+  wire('#fxAll',()=>{ if(!confirm('Apply '+c.name+'’s background effects to ALL capsules? This overwrites their current effects.'))return; CAPSULES.forEach(x=>{ ST[x.id].fx={...s.fx}; }); toast('Effects applied to all capsules'); });
+  wire('#fxResetAll',()=>{ if(!confirm('Reset background effects on ALL capsules to defaults?'))return; CAPSULES.forEach(x=>{ ST[x.id].fx=defaultFx(); }); buildControls(); drawStage(); toast('Effects reset on all capsules'); });
   wire('#dlOne',()=>downloadOne(c));
 }
 function buildLayerControls(){
