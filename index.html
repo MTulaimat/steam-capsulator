@@ -113,6 +113,15 @@
   .pv-meta b{display:block;color:#dfe9f1;font-size:13px}
   .pv-meta small{color:var(--muted);font-size:11px}
   .pv-group{grid-column:1/-1;color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--line);padding-bottom:4px;margin-top:6px}
+  #exportModal{align-items:center;justify-content:center;z-index:60}
+  .dialog{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:22px;width:min(440px,90vw);box-shadow:0 10px 40px rgba(0,0,0,.6)}
+  .dialog h2{margin:0 0 6px;font-size:16px;color:#fff;font-weight:600}
+  .dialog p{margin:0 0 14px;color:var(--muted);font-size:13px}
+  .dialog input[type=text]{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:10px 12px;font-size:14px}
+  .dialog input[type=text]:focus{outline:none;border-color:var(--accent)}
+  .preview-name{margin-top:10px;font-size:12px;color:var(--muted);word-break:break-all;min-height:16px}
+  .preview-name b{color:var(--accent)}
+  .dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
   #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#16202d;border:1px solid var(--line);color:#fff;padding:10px 18px;border-radius:6px;opacity:0;transition:.25s;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.5)}
   #toast.show{opacity:1}
 </style>
@@ -170,6 +179,19 @@
     <button class="action ghost" id="pvClose">✕ Close</button>
   </div>
   <div class="modal-body" id="pvGrid"></div>
+</div>
+
+<div class="modal" id="exportModal">
+  <div class="dialog">
+    <h2>Export capsules</h2>
+    <p>Add an optional filename prefix. Leave it empty to export with the default names.</p>
+    <input type="text" id="prefixInput" placeholder="e.g. My Steam Game" autocomplete="off" />
+    <div class="preview-name" id="prefixPreview"></div>
+    <div class="dialog-actions">
+      <button class="action ghost" id="exportCancel">Cancel</button>
+      <button class="action" id="exportGo">⬇ Export</button>
+    </div>
+  </div>
 </div>
 
 <div id="toast"></div>
@@ -490,7 +512,7 @@ function buildControls(){
   wire('#fxReset',()=>{ s.fx=defaultFx(); buildControls(); drawStage(); });
   wire('#fxAll',()=>{ if(!confirm('Apply '+c.name+'’s background effects to ALL capsules? This overwrites their current effects.'))return; CAPSULES.forEach(x=>{ ST[x.id].fx={...s.fx}; }); toast('Effects applied to all capsules'); });
   wire('#fxResetAll',()=>{ if(!confirm('Reset background effects on ALL capsules to defaults?'))return; CAPSULES.forEach(x=>{ ST[x.id].fx=defaultFx(); }); buildControls(); drawStage(); toast('Effects reset on all capsules'); });
-  wire('#dlOne',()=>downloadOne(c));
+  wire('#dlOne',()=>openExport(c));
 }
 function buildLayerControls(){
   const c=CAPSULES.find(x=>x.id===activeId), host=$('#layerCtl');
@@ -532,26 +554,56 @@ function canvasBlob(c,cv){
   const mime = ext==='jpg' ? 'image/jpeg' : 'image/png';
   return new Promise(res=>cv.toBlob(res, mime, 0.92));
 }
-async function downloadOne(c){
-  const blob=await canvasBlob(c,renderToCanvas(c)), ext=exportExt(c);
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=c.file+'.'+ext;
-  a.click(); URL.revokeObjectURL(a.href); toast('Saved '+c.file+'.'+ext);
+function slugify(s){ return (s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,''); }
+function fname(c,prefix){ return (prefix?prefix+'_':'')+c.file+'.'+exportExt(c); }
+async function downloadOne(c,prefix){
+  const name=fname(c,prefix);
+  const blob=await canvasBlob(c,renderToCanvas(c));
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+  a.click(); URL.revokeObjectURL(a.href); toast('Saved '+name);
 }
-async function downloadAll(){
+async function downloadAll(prefix){
   if(!IMG.bg && !IMG.logo){toast('Nothing to export');return;}
   toast('Rendering all capsules…');
   const zip=new JSZip();
   for(const c of CAPSULES){
     if(c.logoOnly && !IMG.logo) continue;
     if(!c.logoOnly && !IMG.bg && !(IMG.logo && ST[c.id].includeLogo)) continue;
-    const ext=exportExt(c);
-    zip.file(c.file+'.'+ext, await canvasBlob(c,renderToCanvas(c)));
+    zip.file(fname(c,prefix), await canvasBlob(c,renderToCanvas(c)));
   }
   const out=await zip.generateAsync({type:'blob'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(out); a.download='steam_capsules.zip';
-  a.click(); URL.revokeObjectURL(a.href); toast('Downloaded steam_capsules.zip');
+  const zipName=(prefix?prefix+'_':'')+'steam_capsules.zip';
+  const a=document.createElement('a'); a.href=URL.createObjectURL(out); a.download=zipName;
+  a.click(); URL.revokeObjectURL(a.href); toast('Downloaded '+zipName);
 }
-$('#dlAll').addEventListener('click',downloadAll);
+
+/* ---------- Export prefix modal ---------- */
+let lastPrefix='', exportTarget=null; // exportTarget: null => all, else capsule
+function openExport(target){
+  exportTarget=target;
+  const inp=$('#prefixInput'); inp.value=lastPrefix;
+  updatePrefixPreview();
+  $('#exportModal').classList.add('open');
+  setTimeout(()=>inp.focus(),0);
+}
+function closeExport(){ $('#exportModal').classList.remove('open'); }
+function updatePrefixPreview(){
+  const slug=slugify($('#prefixInput').value);
+  const sample = exportTarget || CAPSULES.find(c=>!c.logoOnly) || CAPSULES[0];
+  $('#prefixPreview').innerHTML='Example: <b>'+fname(sample,slug)+'</b>';
+}
+function runExport(){
+  const slug=slugify($('#prefixInput').value); lastPrefix=slug;
+  const target=exportTarget; closeExport();
+  if(target) downloadOne(target,slug); else downloadAll(slug);
+}
+$('#prefixInput').addEventListener('input',updatePrefixPreview);
+$('#prefixInput').addEventListener('keydown',e=>{ if(e.key==='Enter')runExport(); });
+$('#exportGo').addEventListener('click',runExport);
+$('#exportCancel').addEventListener('click',closeExport);
+$('#exportModal').addEventListener('click',e=>{ if(e.target.id==='exportModal')closeExport(); });
+
+$('#dlAll').addEventListener('click',()=>openExport(null));
 
 /* ---------- Preview-all modal ---------- */
 function openPreview(){
@@ -578,9 +630,9 @@ function openPreview(){
 function closePreview(){ $('#modal').classList.remove('open'); }
 $('#pvOpen').addEventListener('click',()=>{ if(IMG.bg||IMG.logo) openPreview(); });
 $('#pvClose').addEventListener('click',closePreview);
-$('#pvDl').addEventListener('click',downloadAll);
+$('#pvDl').addEventListener('click',()=>openExport(null));
 $('#modal').addEventListener('click',e=>{ if(e.target.id==='modal') closePreview(); });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePreview(); });
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape')return; if($('#exportModal').classList.contains('open'))closeExport(); else closePreview(); });
 
 /* ---------- Refresh ---------- */
 function refreshAll(){
