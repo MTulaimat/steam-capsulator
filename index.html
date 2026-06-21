@@ -98,6 +98,19 @@
   .dl-row button{flex:1}
   input[type=file]{display:none}
   .badge{font-size:10px;background:#33485c;color:#bcd;padding:2px 6px;border-radius:10px;margin-left:6px}
+  .modal{position:fixed;inset:0;background:rgba(8,12,16,.9);display:none;z-index:50;flex-direction:column}
+  .modal.open{display:flex}
+  .modal-head{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel2);flex-shrink:0}
+  .modal-head h2{margin:0;font-size:15px;color:#fff;font-weight:600}
+  .modal-body{flex:1;overflow:auto;padding:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;align-content:start}
+  .pv-card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:.15s}
+  .pv-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .pv-thumb{width:100%;height:180px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:repeating-conic-gradient(#2a3340 0% 25%, #232b36 0% 50%) 50%/18px 18px}
+  .pv-thumb canvas{max-width:100%;max-height:100%;box-shadow:0 2px 12px rgba(0,0,0,.5)}
+  .pv-meta{text-align:center}
+  .pv-meta b{display:block;color:#dfe9f1;font-size:13px}
+  .pv-meta small{color:var(--muted);font-size:11px}
+  .pv-group{grid-column:1/-1;color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--line);padding-bottom:4px;margin-top:6px}
   #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#16202d;border:1px solid var(--line);color:#fff;padding:10px 18px;border-radius:6px;opacity:0;transition:.25s;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.5)}
   #toast.show{opacity:1}
 </style>
@@ -124,6 +137,7 @@
     </select>
   </div>
   <button class="action ghost" id="clearLogo" title="Remove the logo from all capsules">No logo</button>
+  <button class="action ghost" id="pvOpen" disabled>▦ Preview all</button>
   <button class="action" id="dlAll" disabled>⬇ Download all (.zip)</button>
 </header>
 
@@ -145,6 +159,16 @@
 
   <aside class="controls" id="controls" style="display:none"></aside>
 </main>
+
+<div class="modal" id="modal">
+  <div class="modal-head">
+    <h2>All capsules — preview</h2>
+    <div class="spacer"></div>
+    <button class="action ghost" id="pvDl">⬇ Download all (.zip)</button>
+    <button class="action ghost" id="pvClose">✕ Close</button>
+  </div>
+  <div class="modal-body" id="pvGrid"></div>
+</div>
 
 <div id="toast"></div>
 
@@ -412,8 +436,9 @@ function buildControls(){
       ${FX.map(f=>`<div class="row"><label>${f.label}</label><input type="range" class="fxR" data-k="${f.k}" min="${f.min}" max="${f.max}" step="1"/><span class="scale-val" id="fxv_${f.k}"></span></div>`).join('')}
       <div class="row"><label>Tint col</label><input type="color" id="tintCol"/><span class="scale-val"></span></div>
       <div class="btn-grid">
-        <button id="fxReset">Reset fx</button>
+        <button id="fxReset">Reset</button>
         <button id="fxAll">Apply to all</button>
+        <button id="fxResetAll">Reset all</button>
       </div>
     </div>`:''}
     <div class="section">
@@ -454,6 +479,7 @@ function buildControls(){
   if(tc){ tc.value=s.fx.tintColor; tc.addEventListener('input',()=>{ s.fx.tintColor=tc.value; if(s.fx.tint===0){s.fx.tint=40; const tr=controls.querySelector('.fxR[data-k=tint]'); if(tr){tr.value=40; $('#fxv_tint').textContent='40%';}} drawStage(); }); }
   wire('#fxReset',()=>{ s.fx=defaultFx(); buildControls(); drawStage(); });
   wire('#fxAll',()=>{ CAPSULES.forEach(x=>{ ST[x.id].fx={...s.fx}; }); toast('Effects applied to all capsules'); });
+  wire('#fxResetAll',()=>{ CAPSULES.forEach(x=>{ ST[x.id].fx=defaultFx(); }); buildControls(); drawStage(); toast('Effects reset on all capsules'); });
   wire('#dlOne',()=>downloadOne(c));
 }
 function buildLayerControls(){
@@ -517,10 +543,40 @@ async function downloadAll(){
 }
 $('#dlAll').addEventListener('click',downloadAll);
 
+/* ---------- Preview-all modal ---------- */
+function openPreview(){
+  const grid=$('#pvGrid'); grid.innerHTML=''; let lastGroup='';
+  CAPSULES.forEach(c=>{
+    if(c.group!==lastGroup){
+      const g=document.createElement('div'); g.className='pv-group'; g.textContent=c.group;
+      grid.appendChild(g); lastGroup=c.group;
+    }
+    const sf=Math.min(210/c.w, 180/c.h);
+    const cv=document.createElement('canvas'); cv.width=Math.round(c.w*sf); cv.height=Math.round(c.h*sf);
+    render(c, cv.getContext('2d'), sf, true);
+    const card=document.createElement('div'); card.className='pv-card';
+    const thumb=document.createElement('div'); thumb.className='pv-thumb'; thumb.appendChild(cv);
+    const meta=document.createElement('div'); meta.className='pv-meta';
+    meta.innerHTML=`<b>${c.name}</b><small>${c.w}×${c.h} · ${c.file}.${exportExt(c)}</small>`;
+    card.appendChild(thumb); card.appendChild(meta);
+    card.title='Click to edit '+c.name;
+    card.addEventListener('click',()=>{ activeId=c.id; activeLayer=c.logoOnly?'logo':'bg'; closePreview(); refreshAll(); });
+    grid.appendChild(card);
+  });
+  $('#modal').classList.add('open');
+}
+function closePreview(){ $('#modal').classList.remove('open'); }
+$('#pvOpen').addEventListener('click',()=>{ if(IMG.bg||IMG.logo) openPreview(); });
+$('#pvClose').addEventListener('click',closePreview);
+$('#pvDl').addEventListener('click',downloadAll);
+$('#modal').addEventListener('click',e=>{ if(e.target.id==='modal') closePreview(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePreview(); });
+
 /* ---------- Refresh ---------- */
 function refreshAll(){
   const has=IMG.bg||IMG.logo;
   $('#dlAll').disabled=!has;
+  $('#pvOpen').disabled=!has;
   emptyHint.style.display=has?'none':'block';
   stageHost.style.display=has?'block':'none';
   controls.style.display=has?'block':'none';
