@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Steam Capsulator — Capsule Image Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --bg:#0e1419; --panel:#1b2838; --panel2:#16202d; --line:#2a3f54;
+    --text:#c6d4df; --muted:#7a8fa3; --accent:#66c0f4; --accent2:#1a9fff;
+    --good:#5ba32b; --warn:#e0a32e; --bad:#cc4b4b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:linear-gradient(180deg,#1b2838,#0e1419);
+    color:var(--text);font:14px/1.4 "Segoe UI",Roboto,Arial,sans-serif;
+    display:flex;flex-direction:column;height:100vh;overflow:hidden;
+  }
+  header{
+    display:flex;align-items:center;gap:16px;padding:10px 16px;
+    background:var(--panel2);border-bottom:1px solid var(--line);flex-shrink:0;flex-wrap:wrap;
+  }
+  header h1{font-size:16px;margin:0;color:#fff;font-weight:600;letter-spacing:.3px}
+  header h1 span{color:var(--accent)}
+  .uploads{display:flex;gap:10px;align-items:center}
+  .upload-btn{
+    display:flex;flex-direction:column;gap:2px;background:var(--panel);
+    border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer;
+    min-width:150px;transition:.15s;
+  }
+  .upload-btn:hover{border-color:var(--accent)}
+  .upload-btn b{color:#fff;font-size:12px}
+  .upload-btn small{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+  .upload-btn.loaded{border-color:var(--good)}
+  .spacer{flex:1}
+  .fmt{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+  .fmt select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:5px 8px;font-size:12px}
+  button.action{
+    background:var(--accent2);color:#fff;border:0;border-radius:6px;
+    padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;
+  }
+  button.action:hover{background:var(--accent)}
+  button.action:disabled{background:#33485c;color:#6f8398;cursor:not-allowed}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  button.ghost:hover{border-color:var(--accent);color:#fff}
+
+  main{display:flex;flex:1;min-height:0}
+  .sidebar{width:230px;background:var(--panel2);border-right:1px solid var(--line);overflow-y:auto;flex-shrink:0}
+  .grp-title{padding:10px 14px 4px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px}
+  .cap-item{
+    display:flex;justify-content:space-between;align-items:center;gap:8px;
+    padding:9px 14px;cursor:pointer;border-left:3px solid transparent;
+  }
+  .cap-item:hover{background:#1d2b3a}
+  .cap-item.active{background:#26384a;border-left-color:var(--accent)}
+  .cap-item b{font-size:13px;color:#dfe9f1;display:block}
+  .cap-item small{color:var(--muted);font-size:11px}
+  .cap-item .dot{width:8px;height:8px;border-radius:50%;background:#3a4f63;flex-shrink:0}
+  .cap-item.ready .dot{background:var(--good)}
+
+  .editor{flex:1;display:flex;flex-direction:column;min-width:0;align-items:center;justify-content:center;padding:18px;overflow:auto}
+  .canvas-wrap{position:relative;box-shadow:0 8px 30px rgba(0,0,0,.5);border:1px solid var(--line);background:
+    repeating-conic-gradient(#2a3340 0% 25%, #232b36 0% 50%) 50%/24px 24px}
+  canvas#stage{display:block;cursor:grab;touch-action:none}
+  canvas#stage.dragging{cursor:grabbing}
+  .stage-info{margin-top:10px;color:var(--muted);font-size:12px;text-align:center}
+  .stage-info b{color:var(--text)}
+  .empty-hint{color:var(--muted);text-align:center;max-width:440px}
+  .empty-hint h2{color:#dfe9f1;font-weight:500}
+
+  .controls{width:300px;background:var(--panel2);border-left:1px solid var(--line);overflow-y:auto;flex-shrink:0;padding:14px}
+  .controls h3{margin:0 0 4px;font-size:14px;color:#fff}
+  .controls .sub{color:var(--muted);font-size:12px;margin-bottom:12px}
+  .section{border-top:1px solid var(--line);padding:12px 0}
+  .section:first-of-type{border-top:0}
+  .section h4{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--accent)}
+  .layer-tabs{display:flex;gap:6px;margin-bottom:10px}
+  .layer-tabs button{flex:1;padding:7px;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;cursor:pointer;font-size:12px}
+  .layer-tabs button.active{background:var(--accent2);border-color:var(--accent2);color:#fff}
+  .layer-tabs button:disabled{opacity:.4;cursor:not-allowed}
+  .row{display:flex;gap:8px;margin-bottom:8px;align-items:center}
+  .row label{width:54px;color:var(--muted);font-size:12px}
+  .row input[type=number]{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:5px 7px;font-size:12px}
+  .row input[type=range]{flex:1;accent-color:var(--accent)}
+  .scale-val{width:48px;text-align:right;color:var(--text);font-size:12px}
+  .btn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .btn-grid button{padding:6px 4px;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;cursor:pointer;font-size:11px}
+  .btn-grid button:hover{border-color:var(--accent);color:#fff}
+  .toggle{display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer;user-select:none}
+  .toggle input{width:16px;height:16px;accent-color:var(--accent)}
+  .note{background:#1f2d3d;border-left:3px solid var(--warn);padding:8px 10px;border-radius:0 5px 5px 0;font-size:12px;color:#c9d6e2;margin-bottom:10px}
+  .note.info{border-left-color:var(--accent)}
+  .dl-row{display:flex;gap:8px;margin-top:6px}
+  .dl-row button{flex:1}
+  input[type=file]{display:none}
+  .badge{font-size:10px;background:#33485c;color:#bcd;padding:2px 6px;border-radius:10px;margin-left:6px}
+  #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#16202d;border:1px solid var(--line);color:#fff;padding:10px 18px;border-radius:6px;opacity:0;transition:.25s;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+  #toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>Steam<span>Capsulator</span></h1>
+  <div class="uploads">
+    <label class="upload-btn" id="bgBtn">
+      <b>① Background</b><small id="bgName">Click / drop image</small>
+      <input type="file" id="bgInput" accept="image/*" />
+    </label>
+    <label class="upload-btn" id="logoBtn">
+      <b>② Logo <span class="badge">optional</span></b><small id="logoName">Skip if bg has logo</small>
+      <input type="file" id="logoInput" accept="image/*" />
+    </label>
+  </div>
+  <div class="spacer"></div>
+  <div class="fmt">
+    Format
+    <select id="fmtSel">
+      <option value="png">PNG</option>
+      <option value="jpg">JPG</option>
+    </select>
+  </div>
+  <button class="action ghost" id="clearLogo" title="Remove the logo from all capsules">No logo</button>
+  <button class="action" id="dlAll" disabled>⬇ Download all (.zip)</button>
+</header>
+
+<main>
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <section class="editor" id="editor">
+    <div class="empty-hint" id="emptyHint">
+      <h2>Upload a background to begin</h2>
+      <p>Add a background image (and optionally a logo). The tool fits them into every Steam
+      capsule size from the guidelines. Then pick a capsule on the left and drag / zoom to refine,
+      or use the numeric fields and anchor presets for precision.</p>
+    </div>
+    <div id="stageHost" style="display:none">
+      <div class="canvas-wrap"><canvas id="stage"></canvas></div>
+      <div class="stage-info" id="stageInfo"></div>
+    </div>
+  </section>
+
+  <aside class="controls" id="controls" style="display:none"></aside>
+</main>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
+const CAPSULES = [
+  {id:'header',    name:'Header Capsule',  w:920,  h:430,  group:'Store',   file:'header_capsule_920x430',     logo:'on'},
+  {id:'small',     name:'Small Capsule',   w:462,  h:174,  group:'Store',   file:'small_capsule_462x174',      logo:'on'},
+  {id:'main',      name:'Main Capsule',    w:1232, h:706,  group:'Store',   file:'main_capsule_1232x706',      logo:'on'},
+  {id:'vertical',  name:'Vertical Capsule',w:748,  h:896,  group:'Store',   file:'vertical_capsule_748x896',   logo:'on'},
+  {id:'pagebg',    name:'Page Background', w:1438, h:810,  group:'Store',   file:'page_background_1438x810',   logo:'off'},
+  {id:'libcap',    name:'Library Capsule', w:600,  h:900,  group:'Library', file:'library_capsule_600x900',    logo:'on'},
+  {id:'libheader', name:'Library Header',  w:920,  h:430,  group:'Library', file:'library_header_920x430',     logo:'on'},
+  {id:'libhero',   name:'Library Hero',    w:3840, h:1240, group:'Library', file:'library_hero_3840x1240',     logo:'forbidden', safe:{w:860,h:380}},
+  {id:'liblogo',   name:'Library Logo',    w:1280, h:720,  group:'Library', file:'library_logo_1280x720',      logo:'on', transparent:true, logoOnly:true},
+];
+
+/* ---------- State ---------- */
+const IMG = {bg:null, logo:null};
+const ST = {};
+let activeId = CAPSULES[0].id;
+let activeLayer = 'bg';
+let fmt = 'png';
+
+CAPSULES.forEach(c=>{
+  ST[c.id] = {
+    includeLogo: c.logo==='on',
+    bg:{scale:1,x:0,y:0,init:false},
+    logo:{scale:1,x:0,y:0,init:false,anchor:'bottom-center'},
+  };
+});
+
+/* ---------- DOM ---------- */
+const $ = s=>document.querySelector(s);
+const sidebar=$('#sidebar'), editor=$('#editor'), controls=$('#controls');
+const emptyHint=$('#emptyHint'), stageHost=$('#stageHost'), stageInfo=$('#stageInfo');
+const stage=$('#stage'), ctx=stage.getContext('2d');
+
+/* ---------- Image loading ---------- */
+function loadFile(file, slot){
+  if(!file) return;
+  const url=URL.createObjectURL(file);
+  const img=new Image();
+  img.onload=()=>{
+    IMG[slot]={img,w:img.naturalWidth,h:img.naturalHeight};
+    CAPSULES.forEach(c=>{ if(slot==='bg') ST[c.id].bg.init=false; else ST[c.id].logo.init=false; });
+    if(slot==='bg'){ $('#bgName').textContent=file.name; $('#bgBtn').classList.add('loaded'); }
+    else{ $('#logoName').textContent=file.name; $('#logoBtn').classList.add('loaded'); }
+    refreshAll();
+    toast(slot==='bg'?'Background loaded — fitted to all capsules':'Logo loaded & placed');
+  };
+  img.src=url;
+}
+$('#bgInput').addEventListener('change',e=>loadFile(e.target.files[0],'bg'));
+$('#logoInput').addEventListener('change',e=>loadFile(e.target.files[0],'logo'));
+['dragover','drop'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault()));
+$('#bgBtn').addEventListener('drop',e=>loadFile(e.dataTransfer.files[0],'bg'));
+$('#logoBtn').addEventListener('drop',e=>loadFile(e.dataTransfer.files[0],'logo'));
+$('#clearLogo').addEventListener('click',()=>{
+  IMG.logo=null; $('#logoName').textContent='Skip if bg has logo'; $('#logoBtn').classList.remove('loaded');
+  $('#logoInput').value=''; toast('Logo removed from all capsules'); refreshAll();
+});
+$('#fmtSel').addEventListener('change',e=>{ fmt=e.target.value; if($('#controls').style.display!=='none')buildControls(); });
+
+/* ---------- Geometry helpers ---------- */
+function ensureBgInit(c){
+  const s=ST[c.id]; if(!IMG.bg || s.bg.init) return;
+  const cover=Math.max(c.w/IMG.bg.w, c.h/IMG.bg.h);
+  s.bg.scale=cover; s.bg.x=(c.w-IMG.bg.w*cover)/2; s.bg.y=(c.h-IMG.bg.h*cover)/2; s.bg.init=true;
+}
+function ensureLogoInit(c){
+  const s=ST[c.id]; if(!IMG.logo || s.logo.init) return;
+  if(c.logoOnly){
+    const fit=Math.min(c.w/IMG.logo.w, c.h/IMG.logo.h);
+    s.logo.scale=fit; s.logo.anchor='mid-center';
+  }else{
+    let sc=(c.w*0.45)/IMG.logo.w;
+    if(IMG.logo.h*sc > c.h*0.4) sc=(c.h*0.4)/IMG.logo.h;
+    s.logo.scale=sc; s.logo.anchor='bottom-center';
+  }
+  applyAnchor(c); s.logo.init=true;
+}
+function applyAnchor(c){
+  const s=ST[c.id]; if(!IMG.logo) return;
+  const lw=IMG.logo.w*s.logo.scale, lh=IMG.logo.h*s.logo.scale;
+  const pad=Math.round(Math.min(c.w,c.h)*0.05);
+  const cx=(c.w-lw)/2, cy=(c.h-lh)/2;
+  switch(s.logo.anchor){
+    case 'top-center':    s.logo.x=cx;  s.logo.y=pad; break;
+    case 'mid-center':    s.logo.x=cx;  s.logo.y=cy;  break;
+    case 'bottom-center': s.logo.x=cx;  s.logo.y=c.h-lh-pad; break;
+    case 'bottom-left':   s.logo.x=pad; s.logo.y=c.h-lh-pad; break;
+    case 'top-left':      s.logo.x=pad; s.logo.y=pad; break;
+    case 'center':        s.logo.x=cx;  s.logo.y=cy;  break;
+  }
+}
+function fitBg(c,mode){
+  const s=ST[c.id]; if(!IMG.bg) return;
+  const f = mode==='cover' ? Math.max(c.w/IMG.bg.w,c.h/IMG.bg.h) : Math.min(c.w/IMG.bg.w,c.h/IMG.bg.h);
+  s.bg.scale=f; s.bg.x=(c.w-IMG.bg.w*f)/2; s.bg.y=(c.h-IMG.bg.h*f)/2;
+}
+
+/* ---------- Rendering ---------- */
+function render(c, g, sf, forExport){
+  g.clearRect(0,0,c.w*sf,c.h*sf);
+  const opaque = !c.transparent || (forExport && fmt==='jpg');
+  if(opaque){ g.fillStyle='#000'; g.fillRect(0,0,c.w*sf,c.h*sf); }
+  if(IMG.bg && !c.logoOnly){
+    ensureBgInit(c); const b=ST[c.id].bg; g.imageSmoothingQuality='high';
+    g.drawImage(IMG.bg.img, b.x*sf, b.y*sf, IMG.bg.w*b.scale*sf, IMG.bg.h*b.scale*sf);
+  }
+  const s=ST[c.id];
+  if(IMG.logo && s.includeLogo && c.logo!=='forbidden'){
+    ensureLogoInit(c); const l=s.logo;
+    g.drawImage(IMG.logo.img, l.x*sf, l.y*sf, IMG.logo.w*l.scale*sf, IMG.logo.h*l.scale*sf);
+  }
+  if(!forExport && c.safe){
+    const sw=c.safe.w*sf, sh=c.safe.h*sf, sx=(c.w*sf-sw)/2, sy=(c.h*sf-sh)/2;
+    g.strokeStyle='rgba(102,192,244,.9)'; g.lineWidth=1; g.setLineDash([6,4]);
+    g.strokeRect(sx,sy,sw,sh); g.setLineDash([]);
+    g.fillStyle='rgba(102,192,244,.9)'; g.font='12px Segoe UI';
+    g.fillText('safe area '+c.safe.w+'×'+c.safe.h, sx+6, sy+16);
+  }
+}
+function displayScale(c){
+  const maxW=Math.min(editor.clientWidth-40, 760), maxH=editor.clientHeight-80;
+  return Math.min(maxW/c.w, maxH/c.h, 2);
+}
+function drawStage(){
+  const c=CAPSULES.find(x=>x.id===activeId), sf=displayScale(c);
+  stage.width=Math.round(c.w*sf); stage.height=Math.round(c.h*sf);
+  render(c,ctx,sf,false);
+  const layerTxt = activeLayer==='bg'?'Background':'Logo';
+  stageInfo.innerHTML = `<b>${c.name}</b> — ${c.w}×${c.h}px &nbsp;·&nbsp; editing <b>${layerTxt}</b> &nbsp;·&nbsp; drag to move, scroll to zoom`;
+}
+
+/* ---------- Interaction ---------- */
+let drag=null;
+function activeLayerState(){ return ST[activeId][activeLayer]; }
+function layerImg(){ return activeLayer==='bg'?IMG.bg:IMG.logo; }
+function layerEditable(){
+  const c=CAPSULES.find(x=>x.id===activeId);
+  if(activeLayer==='bg') return IMG.bg && !c.logoOnly;
+  return IMG.logo && ST[c.id].includeLogo && c.logo!=='forbidden';
+}
+stage.addEventListener('pointerdown',e=>{
+  if(!layerEditable())return;
+  const c=CAPSULES.find(x=>x.id===activeId);
+  drag={x:e.clientX,y:e.clientY,sf:displayScale(c)};
+  stage.classList.add('dragging'); stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove',e=>{
+  if(!drag)return;
+  const l=activeLayerState();
+  l.x+=(e.clientX-drag.x)/drag.sf; l.y+=(e.clientY-drag.y)/drag.sf;
+  drag.x=e.clientX; drag.y=e.clientY; drawStage();
+});
+stage.addEventListener('pointerup',()=>{drag=null;stage.classList.remove('dragging');syncControls();});
+stage.addEventListener('wheel',e=>{
+  if(!layerEditable())return; e.preventDefault();
+  const c=CAPSULES.find(x=>x.id===activeId), l=activeLayerState();
+  const factor=e.deltaY<0?1.06:1/1.06, cx=c.w/2, cy=c.h/2;
+  const px=(cx-l.x)/l.scale, py=(cy-l.y)/l.scale;
+  l.scale*=factor; l.x=cx-px*l.scale; l.y=cy-py*l.scale;
+  drawStage(); syncControls();
+},{passive:false});
+
+/* ---------- Sidebar ---------- */
+function buildSidebar(){
+  sidebar.innerHTML=''; let lastGroup='';
+  CAPSULES.forEach(c=>{
+    if(c.group!==lastGroup){
+      const t=document.createElement('div'); t.className='grp-title'; t.textContent=c.group;
+      sidebar.appendChild(t); lastGroup=c.group;
+    }
+    const ready = c.logoOnly ? !!IMG.logo : !!IMG.bg;
+    const item=document.createElement('div');
+    item.className='cap-item'+(c.id===activeId?' active':'')+(ready?' ready':'');
+    item.innerHTML=`<div><b>${c.name}</b><small>${c.w}×${c.h}</small></div><div class="dot"></div>`;
+    item.addEventListener('click',()=>{ activeId=c.id; activeLayer=c.logoOnly?'logo':'bg'; refreshAll(); });
+    sidebar.appendChild(item);
+  });
+}
+
+/* ---------- Controls ---------- */
+function exportExt(c){ return (c.transparent && fmt==='jpg') ? 'png' : fmt; }
+function buildControls(){
+  const c=CAPSULES.find(x=>x.id===activeId), s=ST[c.id];
+  const hasBg=IMG.bg && !c.logoOnly, logoForbidden=c.logo==='forbidden', canLogo=IMG.logo && !logoForbidden;
+  let logoToggle='';
+  if(logoForbidden){
+    logoToggle=`<div class="note">Steam forbids logos/text on the Library Hero — upload the logo separately as the <b>Library Logo</b>. The dashed box is the 860×380 safe area.</div>`;
+  } else if(c.logoOnly){
+    logoToggle=`<div class="note info">Library Logo is the logo alone on a transparent background — always exported as PNG. The background image is ignored here.</div>`;
+  } else {
+    logoToggle=`<label class="toggle"><input type="checkbox" id="incLogo" ${s.includeLogo?'checked':''} ${IMG.logo?'':'disabled'}/> Include logo on this capsule</label>`;
+  }
+  controls.innerHTML=`
+    <h3>${c.name}</h3>
+    <div class="sub">${c.w}×${c.h}px · exports as ${c.file}.${exportExt(c)}</div>
+    ${logoToggle}
+    <div class="layer-tabs">
+      <button id="tabBg" class="${activeLayer==='bg'?'active':''}" ${hasBg?'':'disabled'}>Background</button>
+      <button id="tabLogo" class="${activeLayer==='logo'?'active':''}" ${canLogo&&s.includeLogo?'':'disabled'}>Logo</button>
+    </div>
+    <div class="section" id="layerCtl"></div>
+    <div class="section">
+      <h4>Background fit</h4>
+      <div class="btn-grid">
+        <button id="bgCover" ${hasBg?'':'disabled'}>Fill</button>
+        <button id="bgContain" ${hasBg?'':'disabled'}>Fit</button>
+        <button id="bgReset" ${hasBg?'':'disabled'}>Reset</button>
+      </div>
+    </div>
+    <div class="section">
+      <h4>Logo anchor</h4>
+      <div class="btn-grid">
+        <button data-a="top-left">↖ TL</button>
+        <button data-a="top-center">↑ Top</button>
+        <button data-a="mid-center">• Mid</button>
+        <button data-a="bottom-left">↙ BL</button>
+        <button data-a="bottom-center">↓ Bottom</button>
+        <button data-a="center">Center</button>
+      </div>
+    </div>
+    <div class="section">
+      <h4>Export</h4>
+      <div class="dl-row"><button class="action" id="dlOne">⬇ Download this</button></div>
+    </div>
+  `;
+  buildLayerControls();
+  $('#tabBg')&&$('#tabBg').addEventListener('click',()=>{activeLayer='bg';refreshAll();});
+  $('#tabLogo')&&$('#tabLogo').addEventListener('click',()=>{activeLayer='logo';refreshAll();});
+  const inc=$('#incLogo');
+  if(inc) inc.addEventListener('change',()=>{ s.includeLogo=inc.checked; if(!inc.checked&&activeLayer==='logo')activeLayer='bg'; refreshAll(); });
+  const wire=(id,fn)=>{const el=$(id);if(el)el.addEventListener('click',fn);};
+  wire('#bgCover',()=>{fitBg(c,'cover');drawStage();syncControls();});
+  wire('#bgContain',()=>{fitBg(c,'contain');drawStage();syncControls();});
+  wire('#bgReset',()=>{s.bg.init=false;ensureBgInit(c);drawStage();syncControls();});
+  controls.querySelectorAll('[data-a]').forEach(b=>b.addEventListener('click',()=>{
+    if(!IMG.logo||logoForbidden){toast('No logo to anchor');return;}
+    s.logo.anchor=b.dataset.a; applyAnchor(c); drawStage(); syncControls();
+  }));
+  wire('#dlOne',()=>downloadOne(c));
+}
+function buildLayerControls(){
+  const c=CAPSULES.find(x=>x.id===activeId), host=$('#layerCtl');
+  const editable=layerEditable(), l=ST[c.id][activeLayer];
+  const name=activeLayer==='bg'?'Background':'Logo';
+  if(!editable){
+    host.innerHTML=`<h4>${name}</h4><div class="sub">${activeLayer==='bg'?(c.logoOnly?'Not used for Library Logo.':'Upload a background image.'):'No logo on this capsule.'}</div>`;
+    return;
+  }
+  host.innerHTML=`
+    <h4>${name} position & scale</h4>
+    <div class="row"><label>Scale</label><input type="range" id="scR" min="2" max="400" step="1"/><span class="scale-val" id="scV"></span></div>
+    <div class="row"><label>X (px)</label><input type="number" id="xN" step="1"/></div>
+    <div class="row"><label>Y (px)</label><input type="number" id="yN" step="1"/></div>
+  `;
+  const scR=$('#scR'),scV=$('#scV'),xN=$('#xN'),yN=$('#yN');
+  const set=()=>{scR.value=Math.round(l.scale*100);scV.textContent=Math.round(l.scale*100)+'%';xN.value=Math.round(l.x);yN.value=Math.round(l.y);};
+  set();
+  scR.addEventListener('input',()=>{
+    const c2=CAPSULES.find(x=>x.id===activeId), ns=Math.max(0.02,scR.value/100);
+    const cx=c2.w/2,cy=c2.h/2,px=(cx-l.x)/l.scale,py=(cy-l.y)/l.scale;
+    l.scale=ns; l.x=cx-px*ns; l.y=cy-py*ns;
+    scV.textContent=Math.round(ns*100)+'%'; xN.value=Math.round(l.x); yN.value=Math.round(l.y); drawStage();
+  });
+  xN.addEventListener('input',()=>{l.x=parseFloat(xN.value)||0;drawStage();});
+  yN.addEventListener('input',()=>{l.y=parseFloat(yN.value)||0;drawStage();});
+  host._set=set;
+}
+function syncControls(){ const h=$('#layerCtl'); if(h&&h._set)h._set(); }
+
+/* ---------- Export ---------- */
+function renderToCanvas(c){
+  const cv=document.createElement('canvas'); cv.width=c.w; cv.height=c.h;
+  render(c,cv.getContext('2d'),1,true); return cv;
+}
+function canvasBlob(c,cv){
+  const ext=exportExt(c);
+  const mime = ext==='jpg' ? 'image/jpeg' : 'image/png';
+  return new Promise(res=>cv.toBlob(res, mime, 0.92));
+}
+async function downloadOne(c){
+  const blob=await canvasBlob(c,renderToCanvas(c)), ext=exportExt(c);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=c.file+'.'+ext;
+  a.click(); URL.revokeObjectURL(a.href); toast('Saved '+c.file+'.'+ext);
+}
+async function downloadAll(){
+  if(!IMG.bg && !IMG.logo){toast('Nothing to export');return;}
+  toast('Rendering all capsules…');
+  const zip=new JSZip();
+  for(const c of CAPSULES){
+    if(c.logoOnly && !IMG.logo) continue;
+    if(!c.logoOnly && !IMG.bg && !(IMG.logo && ST[c.id].includeLogo)) continue;
+    const ext=exportExt(c);
+    zip.file(c.file+'.'+ext, await canvasBlob(c,renderToCanvas(c)));
+  }
+  const out=await zip.generateAsync({type:'blob'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(out); a.download='steam_capsules.zip';
+  a.click(); URL.revokeObjectURL(a.href); toast('Downloaded steam_capsules.zip');
+}
+$('#dlAll').addEventListener('click',downloadAll);
+
+/* ---------- Refresh ---------- */
+function refreshAll(){
+  const has=IMG.bg||IMG.logo;
+  $('#dlAll').disabled=!has;
+  emptyHint.style.display=has?'none':'block';
+  stageHost.style.display=has?'block':'none';
+  controls.style.display=has?'block':'none';
+  buildSidebar();
+  if(has){ buildControls(); drawStage(); }
+}
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),2200);}
+window.addEventListener('resize',()=>{ if(IMG.bg||IMG.logo) drawStage(); });
+buildSidebar();
+</script>
+</body>
+</html>
