@@ -713,6 +713,11 @@ function buildControls(){
       ${lf.glowOn?`
         <div class="row"><label>Blur</label><input type="range" id="glBlur" min="0" max="80" value="${lf.glowBlur}"><span class="scale-val">${lf.glowBlur}</span></div>
         <div class="row"><label>Colour</label><input type="color" id="glCol" value="${lf.glowColor}"></div>`:''}
+      <div class="btn-grid">
+        <button id="lfReset">Reset</button>
+        <button id="lfAll">Apply to all</button>
+        <button id="lfResetAll">Reset all</button>
+      </div>
     </div>`:''}
     <div class="section">
       <h4>Export</h4>
@@ -757,6 +762,9 @@ function buildControls(){
   }));
   bindTog('#olOn','outlineOn'); bindLF('#olW','outlineWidth'); bindLF('#olCol','outlineColor');
   bindTog('#glOn','glowOn'); bindLF('#glBlur','glowBlur'); bindLF('#glCol','glowColor');
+  wire('#lfReset',()=>{ s.logoFx=defaultLogoFx(); buildControls(); drawStage(); });
+  wire('#lfAll',()=>{ if(!confirm('Apply '+c.name+'’s logo style to ALL capsules? This overwrites their current logo styles.'))return; CAPSULES.forEach(x=>{ ST[x.id].logoFx={...s.logoFx}; }); toast('Logo style applied to all capsules'); });
+  wire('#lfResetAll',()=>{ if(!confirm('Reset logo style on ALL capsules to defaults?'))return; CAPSULES.forEach(x=>{ ST[x.id].logoFx=defaultLogoFx(); }); buildControls(); drawStage(); toast('Logo style reset on all capsules'); });
   // background effects
   controls.querySelectorAll('.fxR').forEach(r=>{
     const k=r.dataset.k, f=FX.find(x=>x.k===k);
