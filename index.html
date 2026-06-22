@@ -61,6 +61,19 @@
   button.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
   button.ghost:hover{border-color:var(--accent);color:#fff}
 
+  /* intro: staggered panel reveal */
+  @keyframes introDown{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
+  @keyframes introLeft{from{opacity:0;transform:translateX(-22px)}to{opacity:1;transform:none}}
+  @keyframes introRight{from{opacity:0;transform:translateX(22px)}to{opacity:1;transform:none}}
+  @keyframes introUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  header{animation:introDown .45s cubic-bezier(.2,.7,.3,1) both}
+  .sidebar{animation:introLeft .5s .08s cubic-bezier(.2,.7,.3,1) both}
+  .editor{animation:introUp .55s .16s cubic-bezier(.2,.7,.3,1) both}
+  .controls{animation:introRight .5s .12s cubic-bezier(.2,.7,.3,1) both}
+  @media (prefers-reduced-motion: reduce){
+    header,.sidebar,.editor,.controls{animation:none}
+  }
+
   main{display:flex;flex:1;min-height:0}
   .sidebar{width:230px;background:var(--panel2);border-right:1px solid var(--line);overflow-y:auto;flex-shrink:0}
   .grp-title{padding:10px 14px 4px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px}
@@ -301,7 +314,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = '1.0';
+const APP_VERSION = '1.1';
 
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
