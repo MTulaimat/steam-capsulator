@@ -152,6 +152,7 @@
   .modal.open .step:nth-child(2){animation-delay:.13s}
   .modal.open .step:nth-child(3){animation-delay:.21s}
   .modal.open .step:nth-child(4){animation-delay:.29s}
+  .modal.open .step:nth-child(5){animation-delay:.37s}
   @keyframes stepIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion: reduce){
     .demo-art,.demo-logo,.modal.open .step{animation:none}
@@ -274,9 +275,10 @@
     <p>Generate every Steam store &amp; library capsule image from one background and an optional logo — crop, refine, and export in seconds.</p>
     <div class="steps">
       <div class="step"><span class="step-n">1</span><div><b>Upload</b><small>Add a background image. Optionally add a logo — or skip it if your art already includes one.</small></div></div>
-      <div class="step"><span class="step-n">2</span><div><b>Refine each size</b><small>Pick a capsule on the left, then drag / scroll to position it, and apply background effects like blur, tint &amp; vignette.</small></div></div>
-      <div class="step"><span class="step-n">3</span><div><b>Preview all</b><small>Open “Preview all” to see every capsule side by side and jump straight to any one.</small></div></div>
-      <div class="step"><span class="step-n">4</span><div><b>Export</b><small>Download a single image or all as a ZIP, with an optional filename prefix. Names match each Steam size.</small></div></div>
+      <div class="step"><span class="step-n">2</span><div><b>Select &amp; position</b><small>Pick a capsule on the left, then <b>click the logo or background</b> on the canvas to select it and drag / scroll (or pinch on touch) to position — or use the X/Y/scale fields.</small></div></div>
+      <div class="step"><span class="step-n">3</span><div><b>Style it</b><small>Add background effects (blur, tint, vignette, shade) and logo shadow / outline / glow for legibility. Need a different shot for one size? Override that capsule’s image.</small></div></div>
+      <div class="step"><span class="step-n">4</span><div><b>Preview all</b><small>Open “Preview all” to see every capsule side by side and jump straight to any one.</small></div></div>
+      <div class="step"><span class="step-n">5</span><div><b>Export</b><small>Download a single image or all as a ZIP, with an optional filename prefix. Names match each Steam size.</small></div></div>
     </div>
     <div class="dialog-actions">
       <button class="action" id="welcomeGo">Get started →</button>
@@ -901,11 +903,11 @@ window.addEventListener('resize',()=>{ if(anyImages()) drawStage(); });
 
 /* ---------- Welcome / tutorial ---------- */
 function openWelcome(){ $('#welcome').classList.add('open'); }
-function closeWelcome(){ $('#welcome').classList.remove('open'); try{localStorage.setItem('sc_intro_seen','1');}catch(e){} }
+function closeWelcome(){ $('#welcome').classList.remove('open'); try{localStorage.setItem('sc_intro_seen_v2','1');}catch(e){} }
 $('#helpBtn').addEventListener('click',openWelcome);
 $('#welcomeGo').addEventListener('click',closeWelcome);
 $('#welcome').addEventListener('click',e=>{ if(e.target.id==='welcome')closeWelcome(); });
-try{ if(!localStorage.getItem('sc_intro_seen')) openWelcome(); }catch(e){ openWelcome(); }
+try{ if(!localStorage.getItem('sc_intro_seen_v2')) openWelcome(); }catch(e){ openWelcome(); }
 
 buildSidebar();
 </script>
