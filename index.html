@@ -87,6 +87,20 @@
   .cap-item small{color:var(--muted);font-size:11px}
   .cap-item .dot{width:8px;height:8px;border-radius:50%;background:#3a4f63;flex-shrink:0}
   .cap-item.ready .dot{background:var(--good)}
+  .cap-meta{min-width:0;flex:1}
+  .cap-resize{flex:0 0 auto;width:24px;height:24px;padding:0;background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:4px;cursor:pointer;font-size:13px;line-height:1;opacity:0;transition:.15s}
+  .cap-item:hover .cap-resize,.cap-item.active .cap-resize{opacity:1}
+  .cap-resize:hover{border-color:var(--accent);color:#fff;background:var(--panel)}
+
+  /* capsule-size editor rows (size modal + per-capsule resize) */
+  .size-grp{color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin:14px 0 2px}
+  .size-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line)}
+  .size-grp + .size-row{border-top:0}
+  .size-row .nm{flex:1;min-width:0;color:#dfe9f1;font-size:13px}
+  .size-row .nm small{display:block;color:var(--muted);font-size:11px}
+  .size-row input[type=number]{width:78px;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:6px 8px;font-size:13px}
+  .size-row input[type=number]:focus{outline:none;border-color:var(--accent)}
+  .size-row .x{color:var(--muted);font-size:12px}
 
   .editor{flex:1;display:flex;flex-direction:column;min-width:0;align-items:center;justify-content:center;padding:18px;overflow:auto}
   #stageHost{text-align:center}
@@ -147,7 +161,7 @@
   .pv-meta b{display:block;color:#dfe9f1;font-size:13px}
   .pv-meta small{color:var(--muted);font-size:11px}
   .pv-group{grid-column:1/-1;color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--line);padding-bottom:4px;margin-top:6px}
-  #exportModal{align-items:center;justify-content:center;z-index:60}
+  #exportModal,#sizeModal,#resizeModal{align-items:center;justify-content:center;z-index:60}
   .dialog{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:22px;width:min(440px,90vw);max-height:92vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.6)}
   .dialog.wide{width:min(580px,94vw)}
   /* welcome / tutorial */
@@ -207,6 +221,7 @@
     .cap-item{flex:0 0 auto;white-space:nowrap;border-left:0;border-bottom:3px solid transparent;padding:8px 12px}
     .cap-item.active{border-left-color:transparent;border-bottom-color:var(--accent)}
     .cap-item .dot{display:none}
+    .cap-resize{opacity:1}
     .editor{min-height:54vh;padding:12px}
     .controls{width:100%;border-left:0;border-top:1px solid var(--line)}
     .modal-head{flex-wrap:wrap}
@@ -285,6 +300,34 @@
   </div>
 </div>
 
+<div class="modal" id="sizeModal">
+  <div class="dialog wide">
+    <h2>Capsule sizes</h2>
+    <p>These are Steam's recommended dimensions. Adjust any you need, then generate — the background refits to each one.</p>
+    <div id="sizeList"></div>
+    <div class="dialog-actions">
+      <button class="action ghost" id="sizeReset">Reset to defaults</button>
+      <button class="action" id="sizeGo">Generate →</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="resizeModal">
+  <div class="dialog">
+    <h2 id="rzTitle">Resize capsule</h2>
+    <p>Set a custom size for this capsule. The background and logo refit automatically.</p>
+    <div class="size-row" style="border:0;padding:0">
+      <input type="number" min="1" id="rzW"><span class="x">×</span><input type="number" min="1" id="rzH"><span class="x">px</span>
+    </div>
+    <div class="preview-name" id="rzDefault"></div>
+    <div class="dialog-actions">
+      <button class="action ghost" id="rzReset">Default</button>
+      <button class="action ghost" id="rzCancel">Cancel</button>
+      <button class="action" id="rzGo">Apply</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal welcome" id="welcome">
   <div class="dialog wide">
     <div class="demo" aria-hidden="true">
@@ -296,7 +339,7 @@
     <h2>Welcome to Steam Capsulator</h2>
     <p>Generate every Steam store &amp; library capsule image from one background and an optional logo — crop, refine, and export in seconds.</p>
     <div class="steps">
-      <div class="step"><span class="step-n">1</span><div><b>Upload</b><small>Add a background image. Optionally add a logo — or skip it if your art already includes one.</small></div></div>
+      <div class="step"><span class="step-n">1</span><div><b>Upload</b><small>Add a background image — you'll confirm or tweak the capsule sizes, then generate. Optionally add a logo, or skip it if your art already includes one. Resize any capsule later with the small resize button beside it in the sidebar.</small></div></div>
       <div class="step"><span class="step-n">2</span><div><b>Select &amp; position</b><small>Pick a capsule on the left, then <b>click the logo or background</b> on the canvas to select it and drag / scroll (or pinch on touch) to position — or use the X/Y/scale fields.</small></div></div>
       <div class="step"><span class="step-n">3</span><div><b>Style it</b><small>Add background effects (blur, tint, vignette, shade) and logo shadow / outline / glow for legibility. Need a different shot for one size? Override that capsule’s image.</small></div></div>
       <div class="step"><span class="step-n">4</span><div><b>Preview all</b><small>Open “Preview all” to see every capsule side by side and jump straight to any one.</small></div></div>
@@ -314,20 +357,25 @@
 <script>
 "use strict";
 
-const APP_VERSION = '1.3';
+const APP_VERSION = '1.7';
 
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
-  {id:'header',    name:'Header Capsule',  w:920,  h:430,  group:'Store',   file:'header_capsule_920x430',     logo:'on'},
-  {id:'small',     name:'Small Capsule',   w:462,  h:174,  group:'Store',   file:'small_capsule_462x174',      logo:'on'},
-  {id:'main',      name:'Main Capsule',    w:1232, h:706,  group:'Store',   file:'main_capsule_1232x706',      logo:'on'},
-  {id:'vertical',  name:'Vertical Capsule',w:748,  h:896,  group:'Store',   file:'vertical_capsule_748x896',   logo:'on'},
-  {id:'pagebg',    name:'Page Background', w:1438, h:810,  group:'Store',   file:'page_background_1438x810',   logo:'off'},
-  {id:'libcap',    name:'Library Capsule', w:600,  h:900,  group:'Library', file:'library_capsule_600x900',    logo:'on'},
-  {id:'libheader', name:'Library Header',  w:920,  h:430,  group:'Library', file:'library_header_920x430',     logo:'on'},
-  {id:'libhero',   name:'Library Hero',    w:3840, h:1240, group:'Library', file:'library_hero_3840x1240',     logo:'forbidden', safe:{w:860,h:380}},
-  {id:'liblogo',   name:'Library Logo',    w:1280, h:720,  group:'Library', file:'library_logo_1280x720',      logo:'on', transparent:true, logoOnly:true},
+  {id:'header',    name:'Header Capsule',  w:920,  h:430,  group:'Store',   base:'header_capsule',     logo:'on'},
+  {id:'small',     name:'Small Capsule',   w:462,  h:174,  group:'Store',   base:'small_capsule',      logo:'on'},
+  {id:'main',      name:'Main Capsule',    w:1232, h:706,  group:'Store',   base:'main_capsule',       logo:'on'},
+  {id:'vertical',  name:'Vertical Capsule',w:748,  h:896,  group:'Store',   base:'vertical_capsule',   logo:'on'},
+  {id:'pagebg',    name:'Page Background', w:1438, h:810,  group:'Store',   base:'page_background',    logo:'off'},
+  {id:'libcap',    name:'Library Capsule', w:600,  h:900,  group:'Library', base:'library_capsule',    logo:'on'},
+  {id:'libheader', name:'Library Header',  w:920,  h:430,  group:'Library', base:'library_header',     logo:'on'},
+  {id:'libhero',   name:'Library Hero',    w:3840, h:1240, group:'Library', base:'library_hero',       logo:'forbidden', safe:{w:860,h:380}},
+  {id:'liblogo',   name:'Library Logo',    w:1280, h:720,  group:'Library', base:'library_logo',       logo:'on', transparent:true, logoOnly:true},
 ];
+// remember the Steam-recommended defaults so any capsule can be reset
+const DEFAULT_SIZE = {};
+CAPSULES.forEach(c=>{ DEFAULT_SIZE[c.id]={w:c.w, h:c.h}; });
+// filename is derived from the (possibly customized) size, e.g. header_capsule_920x430
+function fileOf(c){ return c.base+'_'+c.w+'x'+c.h; }
 
 /* ---------- Background effects config ---------- */
 const FX = [
@@ -385,8 +433,8 @@ function loadFile(file, slot){
     CAPSULES.forEach(c=>{ if(slot==='bg') ST[c.id].bg.init=false; else ST[c.id].logo.init=false; });
     if(slot==='bg'){ $('#bgName').textContent=file.name; $('#bgBtn').classList.add('loaded'); }
     else{ $('#logoName').textContent=file.name; $('#logoBtn').classList.add('loaded'); }
-    refreshAll();
-    toast(slot==='bg'?'Background loaded — fitted to all capsules':'Logo loaded & placed');
+    if(slot==='bg'){ openSizeModal(); }   // confirm / tweak sizes, then Generate
+    else{ refreshAll(); toast('Logo loaded & placed'); }
   };
   img.src=url;
 }
@@ -647,8 +695,9 @@ function buildSidebar(){
     const ready = c.logoOnly ? !!logoOf(c) : !!bgOf(c);
     const item=document.createElement('div');
     item.className='cap-item'+(c.id===activeId?' active':'')+(ready?' ready':'');
-    item.innerHTML=`<div><b>${c.name}</b><small>${c.w}×${c.h}</small></div><div class="dot"></div>`;
+    item.innerHTML=`<div class="cap-meta"><b>${c.name}</b><small>${c.w}×${c.h}</small></div><button class="cap-resize" title="Resize ${c.name}">⚙</button><div class="dot"></div>`;
     item.addEventListener('click',()=>{ activeId=c.id; activeLayer=c.logoOnly?'logo':'bg'; refreshAll(); });
+    item.querySelector('.cap-resize').addEventListener('click',e=>{ e.stopPropagation(); openResize(c.id); });
     sidebar.appendChild(item);
   });
 }
@@ -669,7 +718,7 @@ function buildControls(){
   }
   controls.innerHTML=`
     <h3>${c.name}</h3>
-    <div class="sub">${c.w}×${c.h}px · exports as ${c.file}.${exportExt(c)}</div>
+    <div class="sub">${c.w}×${c.h}px · exports as ${fileOf(c)}.${exportExt(c)}</div>
     ${logoToggle}
     <div class="layer-tabs">
       <button id="tabBg" class="${activeLayer==='bg'?'active':''}" ${hasBg?'':'disabled'}>Background</button>
@@ -852,7 +901,7 @@ function canvasBlob(c,cv){
   return new Promise(res=>cv.toBlob(res, mime, 0.92));
 }
 function slugify(s){ return (s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,''); }
-function fname(c,prefix){ return (prefix?prefix+'_':'')+c.file+'.'+exportExt(c); }
+function fname(c,prefix){ return (prefix?prefix+'_':'')+fileOf(c)+'.'+exportExt(c); }
 async function downloadOne(c,prefix){
   const name=fname(c,prefix);
   const blob=await canvasBlob(c,renderToCanvas(c));
@@ -916,7 +965,7 @@ function openPreview(){
     const card=document.createElement('div'); card.className='pv-card';
     const thumb=document.createElement('div'); thumb.className='pv-thumb'; thumb.appendChild(cv);
     const meta=document.createElement('div'); meta.className='pv-meta';
-    meta.innerHTML=`<b>${c.name}</b><small>${c.w}×${c.h} · ${c.file}.${exportExt(c)}</small>`;
+    meta.innerHTML=`<b>${c.name}</b><small>${c.w}×${c.h} · ${fileOf(c)}.${exportExt(c)}</small>`;
     card.appendChild(thumb); card.appendChild(meta);
     card.title='Click to edit '+c.name;
     card.addEventListener('click',()=>{ activeId=c.id; activeLayer=c.logoOnly?'logo':'bg'; closePreview(); refreshAll(); });
@@ -930,9 +979,70 @@ $('#pvClose').addEventListener('click',closePreview);
 $('#pvDl').addEventListener('click',()=>openExport(null));
 $('#modal').addEventListener('click',e=>{ if(e.target.id==='modal') closePreview(); });
 document.addEventListener('keydown',e=>{ if(e.key!=='Escape')return;
-  if($('#welcome').classList.contains('open'))closeWelcome();
+  if($('#resizeModal').classList.contains('open'))closeResize();
+  else if($('#sizeModal').classList.contains('open'))closeSizeModal();
+  else if($('#welcome').classList.contains('open'))closeWelcome();
   else if($('#exportModal').classList.contains('open'))closeExport();
   else closePreview(); });
+
+/* ---------- Capsule size editing ---------- */
+function setSize(c,w,h){
+  w=Math.max(1,Math.round(w||0)); h=Math.max(1,Math.round(h||0));
+  if(!w||!h || (c.w===w && c.h===h)) return false;
+  c.w=w; c.h=h;
+  const s=ST[c.id]; s.bg.init=false; s.logo.init=false; clampBg(c); // refit to the new frame
+  return true;
+}
+// size modal — all capsules, shown on background import
+function buildSizeList(){
+  const host=$('#sizeList'); host.innerHTML=''; let lastGroup='';
+  CAPSULES.forEach(c=>{
+    if(c.group!==lastGroup){ const g=document.createElement('div'); g.className='size-grp'; g.textContent=c.group; host.appendChild(g); lastGroup=c.group; }
+    const d=DEFAULT_SIZE[c.id], row=document.createElement('div'); row.className='size-row';
+    row.innerHTML=`<div class="nm">${c.name}<small>default ${d.w}×${d.h}</small></div>
+      <input type="number" min="1" data-id="${c.id}" data-d="w" value="${c.w}">
+      <span class="x">×</span>
+      <input type="number" min="1" data-id="${c.id}" data-d="h" value="${c.h}">`;
+    host.appendChild(row);
+  });
+}
+function openSizeModal(){ buildSizeList(); $('#sizeModal').classList.add('open'); }
+function closeSizeModal(){ $('#sizeModal').classList.remove('open'); if(anyImages()) refreshAll(); }
+function generateSizes(){
+  $('#sizeList').querySelectorAll('input[data-id]').forEach(inp=>{
+    const c=CAPSULES.find(x=>x.id===inp.dataset.id); if(!c)return;
+    const w=inp.dataset.d==='w'?parseFloat(inp.value):c.w;
+    const h=inp.dataset.d==='h'?parseFloat(inp.value):c.h;
+    setSize(c,w,h);
+  });
+  closeSizeModal();
+}
+$('#sizeGo').addEventListener('click',generateSizes);
+$('#sizeReset').addEventListener('click',()=>{
+  $('#sizeList').querySelectorAll('input[data-id]').forEach(inp=>{ inp.value=DEFAULT_SIZE[inp.dataset.id][inp.dataset.d]; });
+});
+$('#sizeModal').addEventListener('click',e=>{ if(e.target.id==='sizeModal')closeSizeModal(); });
+
+// per-capsule resize dialog (sidebar ⤢ button)
+let resizeId=null;
+function openResize(id){
+  resizeId=id; const c=CAPSULES.find(x=>x.id===id), d=DEFAULT_SIZE[id];
+  $('#rzTitle').textContent='Resize — '+c.name;
+  $('#rzW').value=c.w; $('#rzH').value=c.h;
+  $('#rzDefault').innerHTML='Default: <b>'+d.w+'×'+d.h+'</b>';
+  $('#resizeModal').classList.add('open'); setTimeout(()=>$('#rzW').select(),0);
+}
+function closeResize(){ $('#resizeModal').classList.remove('open'); resizeId=null; }
+function applyResize(){
+  const c=CAPSULES.find(x=>x.id===resizeId); if(!c){closeResize();return;}
+  const changed=setSize(c, parseFloat($('#rzW').value), parseFloat($('#rzH').value));
+  closeResize(); refreshAll(); if(changed) toast(c.name+' resized to '+c.w+'×'+c.h);
+}
+$('#rzGo').addEventListener('click',applyResize);
+$('#rzCancel').addEventListener('click',closeResize);
+$('#rzReset').addEventListener('click',()=>{ const d=DEFAULT_SIZE[resizeId]; $('#rzW').value=d.w; $('#rzH').value=d.h; });
+$('#resizeModal').addEventListener('keydown',e=>{ if(e.key==='Enter')applyResize(); });
+$('#resizeModal').addEventListener('click',e=>{ if(e.target.id==='resizeModal')closeResize(); });
 
 /* ---------- Refresh ---------- */
 function refreshAll(){
