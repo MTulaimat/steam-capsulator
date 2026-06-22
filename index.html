@@ -13,7 +13,12 @@
     --text:#c6d4df; --muted:#7a8fa3; --accent:#66c0f4; --accent2:#1a9fff;
     --good:#5ba32b; --warn:#e0a32e; --bad:#cc4b4b;
   }
-  *{box-sizing:border-box}
+  *{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:#33485c transparent}
+  ::-webkit-scrollbar{width:11px;height:11px}
+  ::-webkit-scrollbar-track{background:var(--panel2)}
+  ::-webkit-scrollbar-thumb{background:#33485c;border-radius:8px;border:2px solid var(--panel2)}
+  ::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+  ::-webkit-scrollbar-corner{background:var(--panel2)}
   html,body{margin:0;height:100%}
   body{
     background:linear-gradient(180deg,#1b2838,#0e1419);
@@ -296,7 +301,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = '0.9';
+const APP_VERSION = '1.0';
 
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
