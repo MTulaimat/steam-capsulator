@@ -66,10 +66,10 @@
   @keyframes introLeft{from{opacity:0;transform:translateX(-22px)}to{opacity:1;transform:none}}
   @keyframes introRight{from{opacity:0;transform:translateX(22px)}to{opacity:1;transform:none}}
   @keyframes introUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
-  header{animation:introDown .45s cubic-bezier(.2,.7,.3,1) both}
-  .sidebar{animation:introLeft .5s .08s cubic-bezier(.2,.7,.3,1) both}
-  .editor{animation:introUp .55s .16s cubic-bezier(.2,.7,.3,1) both}
-  .controls{animation:introRight .5s .12s cubic-bezier(.2,.7,.3,1) both}
+  header{animation:introDown 1.1s cubic-bezier(.2,.7,.3,1) both}
+  .sidebar{animation:introLeft 1.2s .3s cubic-bezier(.2,.7,.3,1) both}
+  .editor{animation:introUp 1.4s .6s cubic-bezier(.2,.7,.3,1) both}
+  .controls{animation:introRight 1.2s .45s cubic-bezier(.2,.7,.3,1) both}
   @media (prefers-reduced-motion: reduce){
     header,.sidebar,.editor,.controls{animation:none}
   }
@@ -314,7 +314,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = '1.1';
+const APP_VERSION = '1.2';
 
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
