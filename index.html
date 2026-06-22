@@ -320,7 +320,7 @@ const FX = [
 function defaultFx(){ const o={tintColor:'#000000'}; FX.forEach(f=>o[f.k]=f.def); return o; }
 function hexA(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
 function defaultLogoFx(){ return {
-  shadowOn:false, shadowBlur:10, shadowDist:6, shadowColor:'#000000', shadowOpacity:65,
+  shadowOn:false, shadowBlur:10, shadowDist:6, shadowAngle:90, shadowColor:'#000000', shadowOpacity:65,
   outlineOn:false, outlineWidth:4, outlineColor:'#000000',
   glowOn:false, glowBlur:16, glowColor:'#ffffff'
 }; }
@@ -481,9 +481,10 @@ function drawLogoWithFx(g, c, sf){
   const OFF=(g.canvas.width||c.w*sf)+dw+2000; // park the source off-canvas so only its shadow shows
   // drop shadow (cast behind everything)
   if(fx.shadowOn){
+    const a=(fx.shadowAngle||0)*Math.PI/180, ox=Math.cos(a)*fx.shadowDist, oy=Math.sin(a)*fx.shadowDist;
     g.save();
     g.shadowColor=hexA(fx.shadowColor, fx.shadowOpacity/100);
-    g.shadowBlur=fx.shadowBlur*sf; g.shadowOffsetX=fx.shadowDist*sf+OFF; g.shadowOffsetY=fx.shadowDist*sf;
+    g.shadowBlur=fx.shadowBlur*sf; g.shadowOffsetX=ox*sf+OFF; g.shadowOffsetY=oy*sf;
     g.drawImage(im.img, dx-OFF, dy, dw, dh);
     g.restore();
   }
@@ -658,14 +659,15 @@ function buildControls(){
       <input type="file" id="ovrLogoInput" accept="image/*" hidden>
       <div class="sub" style="margin:6px 0 0">Use a different image for just this capsule (e.g. a wide shot for the Hero).</div>
     </div>
+    ${activeLayer==='bg'?`
     <div class="section">
       <h4>Background fit</h4>
       <div class="btn-grid">
         <button id="bgCover" ${hasBg?'':'disabled'}>Fill frame</button>
         <button id="bgReset" ${hasBg?'':'disabled'}>Reset</button>
       </div>
-    </div>
-    ${hasBg?`
+    </div>`:''}
+    ${activeLayer==='bg'&&hasBg?`
     <div class="section">
       <h4>Background effects</h4>
       ${FX.map(f=>`<div class="row"><label>${f.label}</label><input type="range" class="fxR" data-k="${f.k}" min="${f.min}" max="${f.max}" step="1"/><span class="scale-val" id="fxv_${f.k}"></span><button class="fxRst" data-k="${f.k}" title="Reset ${f.label}">↺</button></div>`).join('')}
@@ -676,6 +678,7 @@ function buildControls(){
         <button id="fxResetAll">Reset all</button>
       </div>
     </div>`:''}
+    ${activeLayer==='logo'&&showLogoStyle?`
     <div class="section">
       <h4>Logo anchor</h4>
       <div class="btn-grid">
@@ -686,14 +689,20 @@ function buildControls(){
         <button data-a="bottom-center">↓ Bottom</button>
         <button data-a="center">Center</button>
       </div>
-    </div>
-    ${showLogoStyle?`
+    </div>`:''}
+    ${activeLayer==='logo'&&showLogoStyle?`
     <div class="section">
       <h4>Logo style</h4>
       <label class="toggle"><input type="checkbox" id="shOn" ${lf.shadowOn?'checked':''}/> Drop shadow</label>
       ${lf.shadowOn?`
         <div class="row"><label>Blur</label><input type="range" id="shBlur" min="0" max="60" value="${lf.shadowBlur}"><span class="scale-val">${lf.shadowBlur}</span></div>
         <div class="row"><label>Offset</label><input type="range" id="shDist" min="0" max="60" value="${lf.shadowDist}"><span class="scale-val">${lf.shadowDist}</span></div>
+        <div class="row"><label>Angle</label><input type="range" id="shAng" min="0" max="359" value="${lf.shadowAngle}"><span class="scale-val">${lf.shadowAngle}°</span></div>
+        <div class="btn-grid" id="shDir">
+          <button data-deg="225">↖</button><button data-deg="270">↑</button><button data-deg="315">↗</button>
+          <button data-deg="180">←</button><button data-deg="90" title="reset (down)">↺</button><button data-deg="0">→</button>
+          <button data-deg="135">↙</button><button data-deg="90">↓</button><button data-deg="45">↘</button>
+        </div>
         <div class="row"><label>Opacity</label><input type="range" id="shOp" min="0" max="100" value="${lf.shadowOpacity}"><span class="scale-val">${lf.shadowOpacity}%</span></div>
         <div class="row"><label>Colour</label><input type="color" id="shCol" value="${lf.shadowColor}"></div>`:''}
       <label class="toggle"><input type="checkbox" id="olOn" ${lf.outlineOn?'checked':''}/> Outline</label>
@@ -740,7 +749,12 @@ function buildControls(){
     lf[key]= el.type==='color' ? el.value : parseInt(el.value,10);
     const sp=el.parentElement.querySelector('.scale-val'); if(sp) sp.textContent= fmt?fmt(el.value):el.value;
     drawStage(); });};
-  bindTog('#shOn','shadowOn'); bindLF('#shBlur','shadowBlur'); bindLF('#shDist','shadowDist'); bindLF('#shOp','shadowOpacity',v=>v+'%'); bindLF('#shCol','shadowColor');
+  bindTog('#shOn','shadowOn'); bindLF('#shBlur','shadowBlur'); bindLF('#shDist','shadowDist'); bindLF('#shAng','shadowAngle',v=>v+'°'); bindLF('#shOp','shadowOpacity',v=>v+'%'); bindLF('#shCol','shadowColor');
+  controls.querySelectorAll('#shDir button').forEach(b=>b.addEventListener('click',()=>{
+    lf.shadowAngle=parseInt(b.dataset.deg,10);
+    const ang=$('#shAng'); if(ang){ ang.value=lf.shadowAngle; ang.parentElement.querySelector('.scale-val').textContent=lf.shadowAngle+'°'; }
+    drawStage();
+  }));
   bindTog('#olOn','outlineOn'); bindLF('#olW','outlineWidth'); bindLF('#olCol','outlineColor');
   bindTog('#glOn','glowOn'); bindLF('#glBlur','glowBlur'); bindLF('#glCol','glowColor');
   // background effects
