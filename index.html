@@ -24,6 +24,7 @@
   }
   header h1{font-size:16px;margin:0;color:#fff;font-weight:600;letter-spacing:.3px}
   header h1 span{color:var(--accent)}
+  .ver{color:var(--muted);font-size:10px;opacity:.55;align-self:flex-end;margin:0 0 3px -6px;letter-spacing:.5px}
   .uploads{display:flex;gap:10px;align-items:center}
   .upload-btn{
     display:flex;flex-direction:column;gap:2px;background:var(--panel);
@@ -197,6 +198,7 @@
 <body>
 <header>
   <h1>Steam<span>Capsulator</span></h1>
+  <span class="ver" id="ver"></span>
   <div class="uploads">
     <label class="upload-btn hint" id="bgBtn">
       <b>① Background</b><small id="bgName">Click / drop image</small>
@@ -292,6 +294,8 @@
 <script>
 "use strict";
 
+const APP_VERSION = '0.6';
+
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
   {id:'header',    name:'Header Capsule',  w:920,  h:430,  group:'Store',   file:'header_capsule_920x430',     logo:'on'},
@@ -348,6 +352,7 @@ const $ = s=>document.querySelector(s);
 const sidebar=$('#sidebar'), editor=$('#editor'), controls=$('#controls');
 const emptyHint=$('#emptyHint'), stageHost=$('#stageHost'), stageInfo=$('#stageInfo');
 const stage=$('#stage'), ctx=stage.getContext('2d');
+$('#ver').textContent='v'+APP_VERSION;
 
 /* ---------- Image loading ---------- */
 function loadFile(file, slot){
