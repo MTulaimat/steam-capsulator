@@ -110,10 +110,11 @@
   .modal.open{display:flex}
   .modal-head{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel2);flex-shrink:0}
   .modal-head h2{margin:0;font-size:15px;color:#fff;font-weight:600}
-  .modal-body{flex:1;overflow:auto;padding:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;align-content:start}
+  .modal-body{flex:1;overflow:auto;padding:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px;align-content:start}
+  @media(min-width:1000px){ .modal-body{grid-template-columns:repeat(3,1fr)} }
   .pv-card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:.15s}
   .pv-card:hover{border-color:var(--accent);transform:translateY(-2px)}
-  .pv-thumb{width:100%;height:180px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:repeating-conic-gradient(#2a3340 0% 25%, #232b36 0% 50%) 50%/18px 18px}
+  .pv-thumb{width:100%;height:300px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:repeating-conic-gradient(#2a3340 0% 25%, #232b36 0% 50%) 50%/18px 18px}
   .pv-thumb canvas{max-width:100%;max-height:100%;box-shadow:0 2px 12px rgba(0,0,0,.5)}
   .pv-meta{text-align:center}
   .pv-meta b{display:block;color:#dfe9f1;font-size:13px}
@@ -709,7 +710,7 @@ function openPreview(){
       const g=document.createElement('div'); g.className='pv-group'; g.textContent=c.group;
       grid.appendChild(g); lastGroup=c.group;
     }
-    const sf=Math.min(210/c.w, 180/c.h);
+    const sf=Math.min(440/c.w, 290/c.h);
     const cv=document.createElement('canvas'); cv.width=Math.round(c.w*sf); cv.height=Math.round(c.h*sf);
     render(c, cv.getContext('2d'), sf, true);
     const card=document.createElement('div'); card.className='pv-card';
