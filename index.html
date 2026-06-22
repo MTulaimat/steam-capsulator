@@ -31,6 +31,12 @@
     min-width:150px;transition:.15s;
   }
   .upload-btn:hover{border-color:var(--accent)}
+  .upload-btn.hint{animation:hintPulse 1.7s ease-in-out infinite}
+  @keyframes hintPulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(102,192,244,0);border-color:var(--line)}
+    50%{box-shadow:0 0 0 4px rgba(102,192,244,.28);border-color:var(--accent)}
+  }
+  @media (prefers-reduced-motion: reduce){ .upload-btn.hint{animation:none} }
   .upload-btn b{color:#fff;font-size:12px}
   .upload-btn small{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
   .upload-btn.loaded{border-color:var(--good)}
@@ -160,11 +166,11 @@
 <header>
   <h1>Steam<span>Capsulator</span></h1>
   <div class="uploads">
-    <label class="upload-btn" id="bgBtn">
+    <label class="upload-btn hint" id="bgBtn">
       <b>① Background</b><small id="bgName">Click / drop image</small>
       <input type="file" id="bgInput" accept="image/*" />
     </label>
-    <label class="upload-btn" id="logoBtn">
+    <label class="upload-btn hint" id="logoBtn">
       <b>② Logo <span class="badge">optional</span></b><small id="logoName">Skip if bg has logo</small>
       <input type="file" id="logoInput" accept="image/*" />
     </label>
@@ -310,6 +316,7 @@ function loadFile(file, slot){
   const img=new Image();
   img.onload=()=>{
     IMG[slot]={img,w:img.naturalWidth,h:img.naturalHeight};
+    document.querySelectorAll('.upload-btn.hint').forEach(b=>b.classList.remove('hint'));
     CAPSULES.forEach(c=>{ if(slot==='bg') ST[c.id].bg.init=false; else ST[c.id].logo.init=false; });
     if(slot==='bg'){ $('#bgName').textContent=file.name; $('#bgBtn').classList.add('loaded'); }
     else{ $('#logoName').textContent=file.name; $('#logoBtn').classList.add('loaded'); }
