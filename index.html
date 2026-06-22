@@ -161,6 +161,31 @@
   .dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
   #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#16202d;border:1px solid var(--line);color:#fff;padding:10px 18px;border-radius:6px;opacity:0;transition:.25s;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.5)}
   #toast.show{opacity:1}
+
+  /* ---------- Mobile / small screens ---------- */
+  @media (max-width:820px){
+    body{height:auto;min-height:100vh;overflow:auto}
+    header{gap:8px;padding:8px 10px}
+    header h1{width:100%;font-size:15px}
+    .uploads{flex:1 1 100%}
+    .upload-btn{flex:1 1 0;min-width:0}
+    .upload-btn small{max-width:none}
+    .spacer{display:none}
+    header .action{flex:1 1 auto;text-align:center}
+    #helpBtn{flex:0 0 auto}
+    main{flex-direction:column}
+    .sidebar{width:100%;height:auto;display:flex;overflow-x:auto;overflow-y:hidden;border-right:0;border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
+    .sidebar .grp-title{display:none}
+    .cap-item{flex:0 0 auto;white-space:nowrap;border-left:0;border-bottom:3px solid transparent;padding:8px 12px}
+    .cap-item.active{border-left-color:transparent;border-bottom-color:var(--accent)}
+    .cap-item .dot{display:none}
+    .editor{min-height:54vh;padding:12px}
+    .controls{width:100%;border-left:0;border-top:1px solid var(--line)}
+    .modal-head{flex-wrap:wrap}
+    .modal-head h2{width:100%}
+    .pv-thumb{height:200px}
+    .stage-info{font-size:11px}
+  }
 </style>
 </head>
 <body>
@@ -453,7 +478,7 @@ function drawStage(){
   render(c,ctx,sf,false);
   drawSelection(c,sf);
   const layerTxt = activeLayer==='bg'?'Background':'Logo';
-  stageInfo.innerHTML = `<b>${c.name}</b> — ${c.w}×${c.h}px &nbsp;·&nbsp; <b>click</b> the logo or background to select &nbsp;·&nbsp; editing <b>${layerTxt}</b> &nbsp;·&nbsp; drag to move, scroll to zoom`;
+  stageInfo.innerHTML = `<b>${c.name}</b> — ${c.w}×${c.h}px &nbsp;·&nbsp; <b>tap/click</b> the logo or background to select &nbsp;·&nbsp; editing <b>${layerTxt}</b> &nbsp;·&nbsp; drag to move, scroll / pinch to zoom`;
 }
 
 /* ---------- Interaction ---------- */
@@ -472,29 +497,55 @@ function pointHitsLogo(c,e){
   const px=(e.clientX-rect.left)/sf, py=(e.clientY-rect.top)/sf, l=ST[c.id].logo;
   return px>=l.x && px<=l.x+IMG.logo.w*l.scale && py>=l.y && py<=l.y+IMG.logo.h*l.scale;
 }
+const ptrs=new Map(); let pinch=null;
+function curCap(){ return CAPSULES.find(x=>x.id===activeId); }
+function startPinch(c){
+  if(!layerEditable()){ pinch=null; return; }
+  const pts=[...ptrs.values()], a=pts[0], b=pts[1];
+  const sf=displayScale(c), rect=stage.getBoundingClientRect(), l=activeLayerState();
+  const mx=((a.x+b.x)/2-rect.left)/sf, my=((a.y+b.y)/2-rect.top)/sf;
+  pinch={dist:Math.hypot(a.x-b.x,a.y-b.y), scale:l.scale, imgX:(mx-l.x)/l.scale, imgY:(my-l.y)/l.scale};
+}
 stage.addEventListener('pointerdown',e=>{
-  const c=CAPSULES.find(x=>x.id===activeId);
-  // pick the layer from where you clicked: logo if you hit it, otherwise background
-  let want = c.logoOnly ? 'logo' : (pointHitsLogo(c,e) ? 'logo' : (IMG.bg ? 'bg' : (logoVisible(c)?'logo':activeLayer)));
-  if(want!==activeLayer){ activeLayer=want; buildControls(); }
-  if(!layerEditable()){ drawStage(); return; }
-  drag={x:e.clientX,y:e.clientY,sf:displayScale(c)};
-  stage.classList.add('dragging'); stage.setPointerCapture(e.pointerId);
+  const c=curCap();
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===1){
+    // pick the layer from where you tapped: logo if you hit it, otherwise background
+    let want = c.logoOnly ? 'logo' : (pointHitsLogo(c,e) ? 'logo' : (IMG.bg ? 'bg' : (logoVisible(c)?'logo':activeLayer)));
+    if(want!==activeLayer){ activeLayer=want; buildControls(); }
+    if(layerEditable()){ drag={x:e.clientX,y:e.clientY,sf:displayScale(c)}; stage.classList.add('dragging'); }
+    else drag=null;
+  } else if(ptrs.size===2){ drag=null; startPinch(c); }
+  stage.setPointerCapture(e.pointerId);
   drawStage();
 });
 stage.addEventListener('pointermove',e=>{
-  if(!drag){
-    const c=CAPSULES.find(x=>x.id===activeId);
-    stage.style.cursor = (pointHitsLogo(c,e) && activeLayer!=='logo') ? 'pointer' : 'grab';
-    return;
+  if(ptrs.has(e.pointerId)) ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  const c=curCap();
+  if(pinch && ptrs.size>=2){ // pinch-to-zoom the active layer about the two-finger midpoint
+    const pts=[...ptrs.values()], a=pts[0], b=pts[1];
+    const sf=displayScale(c), rect=stage.getBoundingClientRect(), l=activeLayerState();
+    const ns=Math.max(0.02, pinch.scale*(Math.hypot(a.x-b.x,a.y-b.y)/pinch.dist));
+    const mx=((a.x+b.x)/2-rect.left)/sf, my=((a.y+b.y)/2-rect.top)/sf;
+    l.scale=ns; l.x=mx-pinch.imgX*ns; l.y=my-pinch.imgY*ns;
+    if(activeLayer==='bg') clampBg(c);
+    drawStage(); syncControls(); return;
   }
+  if(!drag){ stage.style.cursor = (pointHitsLogo(c,e) && activeLayer!=='logo') ? 'pointer' : 'grab'; return; }
   const l=activeLayerState();
   l.x+=(e.clientX-drag.x)/drag.sf; l.y+=(e.clientY-drag.y)/drag.sf;
   drag.x=e.clientX; drag.y=e.clientY;
-  if(activeLayer==='bg') clampBg(CAPSULES.find(x=>x.id===activeId));
+  if(activeLayer==='bg') clampBg(c);
   drawStage();
 });
-stage.addEventListener('pointerup',()=>{drag=null;stage.classList.remove('dragging');syncControls();});
+function endPointer(e){
+  ptrs.delete(e.pointerId);
+  if(ptrs.size<2) pinch=null;
+  if(ptrs.size===1 && layerEditable()){ const p=[...ptrs.values()][0]; drag={x:p.x,y:p.y,sf:displayScale(curCap())}; }
+  if(ptrs.size===0){ drag=null; stage.classList.remove('dragging'); syncControls(); }
+}
+stage.addEventListener('pointerup',endPointer);
+stage.addEventListener('pointercancel',endPointer);
 stage.addEventListener('wheel',e=>{
   if(!layerEditable())return; e.preventDefault();
   const c=CAPSULES.find(x=>x.id===activeId), l=activeLayerState();
