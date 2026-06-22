@@ -98,6 +98,11 @@
   .btn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
   .btn-grid button{padding:6px 4px;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;cursor:pointer;font-size:11px}
   .btn-grid button:hover{border-color:var(--accent);color:#fff}
+  .img-ovr{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+  .img-ovr span{flex:1;font-size:12px;color:var(--text)}
+  .img-ovr span em{color:var(--accent);font-style:normal;font-size:11px}
+  .img-ovr button{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer}
+  .img-ovr button:hover{border-color:var(--accent);color:#fff}
   .toggle{display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer;user-select:none}
   .toggle input{width:16px;height:16px;accent-color:var(--accent)}
   .note{background:#1f2d3d;border-left:3px solid var(--warn);padding:8px 10px;border-radius:0 5px 5px 0;font-size:12px;color:#c9d6e2;margin-bottom:10px}
@@ -312,6 +317,11 @@ const FX = [
 ];
 function defaultFx(){ const o={tintColor:'#000000'}; FX.forEach(f=>o[f.k]=f.def); return o; }
 function hexA(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
+function defaultLogoFx(){ return {
+  shadowOn:false, shadowBlur:10, shadowDist:6, shadowColor:'#000000', shadowOpacity:65,
+  outlineOn:false, outlineWidth:4, outlineColor:'#000000',
+  glowOn:false, glowBlur:16, glowColor:'#ffffff'
+}; }
 
 /* ---------- State ---------- */
 const IMG = {bg:null, logo:null};
@@ -326,6 +336,8 @@ CAPSULES.forEach(c=>{
     bg:{scale:1,x:0,y:0,init:false},
     logo:{scale:1,x:0,y:0,init:false,anchor:'bottom-center'},
     fx:defaultFx(),
+    logoFx:defaultLogoFx(),
+    bgImg:null, logoImg:null,   // per-capsule image overrides (fall back to globals)
   };
 });
 
@@ -362,27 +374,39 @@ $('#clearLogo').addEventListener('click',()=>{
 });
 $('#fmtSel').addEventListener('change',e=>{ fmt=e.target.value; if($('#controls').style.display!=='none')buildControls(); });
 
+/* ---------- Per-capsule image resolution ---------- */
+function bgOf(c){ return ST[c.id].bgImg || IMG.bg; }
+function logoOf(c){ return ST[c.id].logoImg || IMG.logo; }
+function anyImages(){ return !!(IMG.bg||IMG.logo) || CAPSULES.some(c=>ST[c.id].bgImg||ST[c.id].logoImg); }
+function silhouette(im, color){ // solid-colour copy of the logo's alpha, cached on the image object
+  if(im._sil && im._sil.color===color) return im._sil.cv;
+  const cv=document.createElement('canvas'); cv.width=im.w; cv.height=im.h;
+  const g=cv.getContext('2d'); g.drawImage(im.img,0,0);
+  g.globalCompositeOperation='source-in'; g.fillStyle=color; g.fillRect(0,0,im.w,im.h);
+  im._sil={color,cv}; return cv;
+}
+
 /* ---------- Geometry helpers ---------- */
 function ensureBgInit(c){
-  const s=ST[c.id]; if(!IMG.bg || s.bg.init) return;
-  const cover=Math.max(c.w/IMG.bg.w, c.h/IMG.bg.h);
-  s.bg.scale=cover; s.bg.x=(c.w-IMG.bg.w*cover)/2; s.bg.y=(c.h-IMG.bg.h*cover)/2; s.bg.init=true;
+  const bg=bgOf(c), s=ST[c.id]; if(!bg || s.bg.init) return;
+  const cover=Math.max(c.w/bg.w, c.h/bg.h);
+  s.bg.scale=cover; s.bg.x=(c.w-bg.w*cover)/2; s.bg.y=(c.h-bg.h*cover)/2; s.bg.init=true;
 }
 function ensureLogoInit(c){
-  const s=ST[c.id]; if(!IMG.logo || s.logo.init) return;
+  const lg=logoOf(c), s=ST[c.id]; if(!lg || s.logo.init) return;
   if(c.logoOnly){
-    const fit=Math.min(c.w/IMG.logo.w, c.h/IMG.logo.h);
+    const fit=Math.min(c.w/lg.w, c.h/lg.h);
     s.logo.scale=fit; s.logo.anchor='mid-center';
   }else{
-    let sc=(c.w*0.45)/IMG.logo.w;
-    if(IMG.logo.h*sc > c.h*0.4) sc=(c.h*0.4)/IMG.logo.h;
+    let sc=(c.w*0.45)/lg.w;
+    if(lg.h*sc > c.h*0.4) sc=(c.h*0.4)/lg.h;
     s.logo.scale=sc; s.logo.anchor='bottom-center';
   }
   applyAnchor(c); s.logo.init=true;
 }
 function applyAnchor(c){
-  const s=ST[c.id]; if(!IMG.logo) return;
-  const lw=IMG.logo.w*s.logo.scale, lh=IMG.logo.h*s.logo.scale;
+  const lg=logoOf(c), s=ST[c.id]; if(!lg) return;
+  const lw=lg.w*s.logo.scale, lh=lg.h*s.logo.scale;
   const pad=Math.round(Math.min(c.w,c.h)*0.05);
   const cx=(c.w-lw)/2, cy=(c.h-lh)/2;
   switch(s.logo.anchor){
@@ -395,16 +419,16 @@ function applyAnchor(c){
   }
 }
 function fitBg(c,mode){
-  const s=ST[c.id]; if(!IMG.bg) return;
-  const f = mode==='cover' ? Math.max(c.w/IMG.bg.w,c.h/IMG.bg.h) : Math.min(c.w/IMG.bg.w,c.h/IMG.bg.h);
-  s.bg.scale=f; s.bg.x=(c.w-IMG.bg.w*f)/2; s.bg.y=(c.h-IMG.bg.h*f)/2;
+  const bg=bgOf(c), s=ST[c.id]; if(!bg) return;
+  const f = mode==='cover' ? Math.max(c.w/bg.w,c.h/bg.h) : Math.min(c.w/bg.w,c.h/bg.h);
+  s.bg.scale=f; s.bg.x=(c.w-bg.w*f)/2; s.bg.y=(c.h-bg.h*f)/2;
 }
 // keep the background fully covering the frame — never expose an empty edge
 function clampBg(c){
-  const s=ST[c.id]; if(!IMG.bg || c.logoOnly) return;
-  const cover=Math.max(c.w/IMG.bg.w, c.h/IMG.bg.h);
+  const bg=bgOf(c), s=ST[c.id]; if(!bg || c.logoOnly) return;
+  const cover=Math.max(c.w/bg.w, c.h/bg.h);
   if(s.bg.scale < cover) s.bg.scale=cover;
-  const dw=IMG.bg.w*s.bg.scale, dh=IMG.bg.h*s.bg.scale;
+  const dw=bg.w*s.bg.scale, dh=bg.h*s.bg.scale;
   s.bg.x = Math.min(0, Math.max(c.w-dw, s.bg.x));
   s.bg.y = Math.min(0, Math.max(c.h-dh, s.bg.y));
 }
@@ -415,11 +439,12 @@ function render(c, g, sf, forExport){
   g.clearRect(0,0,W,H);
   const opaque = !c.transparent || (forExport && fmt==='jpg');
   if(opaque){ g.fillStyle='#000'; g.fillRect(0,0,W,H); }
-  if(IMG.bg && !c.logoOnly){
+  const bg=bgOf(c);
+  if(bg && !c.logoOnly){
     ensureBgInit(c); const b=ST[c.id].bg, fx=ST[c.id].fx; g.imageSmoothingQuality='high';
     g.filter=`blur(${(fx.blur*sf).toFixed(2)}px) brightness(${fx.brightness}%) contrast(${fx.contrast}%) saturate(${fx.saturate}%) grayscale(${fx.grayscale}%)`;
     const bleed=fx.blur>0 ? fx.blur*3*sf : 0; // push blur fade past the canvas edge
-    g.drawImage(IMG.bg.img, b.x*sf-bleed, b.y*sf-bleed, IMG.bg.w*b.scale*sf+2*bleed, IMG.bg.h*b.scale*sf+2*bleed);
+    g.drawImage(bg.img, b.x*sf-bleed, b.y*sf-bleed, bg.w*b.scale*sf+2*bleed, bg.h*b.scale*sf+2*bleed);
     g.filter='none';
     if(fx.tint>0){ g.fillStyle=hexA(fx.tintColor,fx.tint/100); g.fillRect(0,0,W,H); }
     if(fx.darken>0){ g.fillStyle=`rgba(0,0,0,${fx.darken/100})`; g.fillRect(0,0,W,H); }
@@ -437,9 +462,8 @@ function render(c, g, sf, forExport){
     }
   }
   const s=ST[c.id];
-  if(IMG.logo && s.includeLogo && c.logo!=='forbidden'){
-    ensureLogoInit(c); const l=s.logo;
-    g.drawImage(IMG.logo.img, l.x*sf, l.y*sf, IMG.logo.w*l.scale*sf, IMG.logo.h*l.scale*sf);
+  if(logoOf(c) && s.includeLogo && c.logo!=='forbidden'){
+    ensureLogoInit(c); drawLogoWithFx(g, c, sf);
   }
   if(!forExport && c.safe){
     const sw=c.safe.w*sf, sh=c.safe.h*sf, sx=(c.w*sf-sw)/2, sy=(c.h*sf-sh)/2;
@@ -449,6 +473,34 @@ function render(c, g, sf, forExport){
     g.fillText('safe area '+c.safe.w+'×'+c.safe.h, sx+6, sy+16);
   }
 }
+function drawLogoWithFx(g, c, sf){
+  const im=logoOf(c), l=ST[c.id].logo, fx=ST[c.id].logoFx;
+  const dx=l.x*sf, dy=l.y*sf, dw=im.w*l.scale*sf, dh=im.h*l.scale*sf;
+  const OFF=(g.canvas.width||c.w*sf)+dw+2000; // park the source off-canvas so only its shadow shows
+  // drop shadow (cast behind everything)
+  if(fx.shadowOn){
+    g.save();
+    g.shadowColor=hexA(fx.shadowColor, fx.shadowOpacity/100);
+    g.shadowBlur=fx.shadowBlur*sf; g.shadowOffsetX=fx.shadowDist*sf+OFF; g.shadowOffsetY=fx.shadowDist*sf;
+    g.drawImage(im.img, dx-OFF, dy, dw, dh);
+    g.restore();
+  }
+  // glow (soft halo around the mark)
+  if(fx.glowOn){
+    g.save();
+    g.shadowColor=fx.glowColor; g.shadowBlur=fx.glowBlur*sf; g.shadowOffsetX=OFF; g.shadowOffsetY=0;
+    g.drawImage(im.img, dx-OFF, dy, dw, dh);
+    g.drawImage(im.img, dx-OFF, dy, dw, dh); // second pass intensifies the glow
+    g.restore();
+  }
+  // outline (coloured silhouette ringed around the logo)
+  if(fx.outlineOn && fx.outlineWidth>0){
+    const sil=silhouette(im, fx.outlineColor), ow=fx.outlineWidth*sf, steps=20;
+    for(let i=0;i<steps;i++){ const a=i/steps*Math.PI*2;
+      g.drawImage(sil, dx+Math.cos(a)*ow, dy+Math.sin(a)*ow, dw, dh); }
+  }
+  g.drawImage(im.img, dx, dy, dw, dh); // the logo itself on top
+}
 function displayScale(c){
   const maxW=Math.min(editor.clientWidth-40, 760), maxH=editor.clientHeight-80;
   return Math.min(maxW/c.w, maxH/c.h, 2);
@@ -456,7 +508,7 @@ function displayScale(c){
 function drawSelection(c,sf){
   // logo box: bright when selected, faint (but present) otherwise so it reads as clickable
   if(logoVisible(c)){
-    const l=ST[c.id].logo, x=l.x*sf, y=l.y*sf, w=IMG.logo.w*l.scale*sf, h=IMG.logo.h*l.scale*sf;
+    const lg=logoOf(c), l=ST[c.id].logo, x=l.x*sf, y=l.y*sf, w=lg.w*l.scale*sf, h=lg.h*l.scale*sf;
     ctx.lineWidth=1.5;
     if(activeLayer==='logo'){ ctx.strokeStyle='rgba(102,192,244,.95)'; ctx.setLineDash([6,4]); }
     else { ctx.strokeStyle='rgba(255,255,255,.3)'; ctx.setLineDash([4,5]); }
@@ -467,7 +519,7 @@ function drawSelection(c,sf){
     }
   }
   // background selected: dashed inset frame
-  if(activeLayer==='bg' && IMG.bg && !c.logoOnly){
+  if(activeLayer==='bg' && bgOf(c) && !c.logoOnly){
     ctx.strokeStyle='rgba(102,192,244,.85)'; ctx.lineWidth=2; ctx.setLineDash([10,6]);
     ctx.strokeRect(2,2,stage.width-4,stage.height-4); ctx.setLineDash([]);
   }
@@ -484,18 +536,18 @@ function drawStage(){
 /* ---------- Interaction ---------- */
 let drag=null;
 function activeLayerState(){ return ST[activeId][activeLayer]; }
-function layerImg(){ return activeLayer==='bg'?IMG.bg:IMG.logo; }
+function layerImg(){ const c=curCap(); return activeLayer==='bg'?bgOf(c):logoOf(c); }
 function layerEditable(){
   const c=CAPSULES.find(x=>x.id===activeId);
-  if(activeLayer==='bg') return IMG.bg && !c.logoOnly;
-  return IMG.logo && ST[c.id].includeLogo && c.logo!=='forbidden';
+  if(activeLayer==='bg') return bgOf(c) && !c.logoOnly;
+  return logoOf(c) && ST[c.id].includeLogo && c.logo!=='forbidden';
 }
-function logoVisible(c){ return IMG.logo && ST[c.id].includeLogo && c.logo!=='forbidden'; }
+function logoVisible(c){ return logoOf(c) && ST[c.id].includeLogo && c.logo!=='forbidden'; }
 function pointHitsLogo(c,e){
   if(!logoVisible(c)) return false;
-  const sf=displayScale(c), rect=stage.getBoundingClientRect();
+  const lg=logoOf(c), sf=displayScale(c), rect=stage.getBoundingClientRect();
   const px=(e.clientX-rect.left)/sf, py=(e.clientY-rect.top)/sf, l=ST[c.id].logo;
-  return px>=l.x && px<=l.x+IMG.logo.w*l.scale && py>=l.y && py<=l.y+IMG.logo.h*l.scale;
+  return px>=l.x && px<=l.x+lg.w*l.scale && py>=l.y && py<=l.y+lg.h*l.scale;
 }
 const ptrs=new Map(); let pinch=null;
 function curCap(){ return CAPSULES.find(x=>x.id===activeId); }
@@ -511,7 +563,7 @@ stage.addEventListener('pointerdown',e=>{
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(ptrs.size===1){
     // pick the layer from where you tapped: logo if you hit it, otherwise background
-    let want = c.logoOnly ? 'logo' : (pointHitsLogo(c,e) ? 'logo' : (IMG.bg ? 'bg' : (logoVisible(c)?'logo':activeLayer)));
+    let want = c.logoOnly ? 'logo' : (pointHitsLogo(c,e) ? 'logo' : (bgOf(c) ? 'bg' : (logoVisible(c)?'logo':activeLayer)));
     if(want!==activeLayer){ activeLayer=want; buildControls(); }
     if(layerEditable()){ drag={x:e.clientX,y:e.clientY,sf:displayScale(c)}; stage.classList.add('dragging'); }
     else drag=null;
@@ -564,7 +616,7 @@ function buildSidebar(){
       const t=document.createElement('div'); t.className='grp-title'; t.textContent=c.group;
       sidebar.appendChild(t); lastGroup=c.group;
     }
-    const ready = c.logoOnly ? !!IMG.logo : !!IMG.bg;
+    const ready = c.logoOnly ? !!logoOf(c) : !!bgOf(c);
     const item=document.createElement('div');
     item.className='cap-item'+(c.id===activeId?' active':'')+(ready?' ready':'');
     item.innerHTML=`<div><b>${c.name}</b><small>${c.w}×${c.h}</small></div><div class="dot"></div>`;
@@ -576,15 +628,16 @@ function buildSidebar(){
 /* ---------- Controls ---------- */
 function exportExt(c){ return (c.transparent && fmt==='jpg') ? 'png' : fmt; }
 function buildControls(){
-  const c=CAPSULES.find(x=>x.id===activeId), s=ST[c.id];
-  const hasBg=IMG.bg && !c.logoOnly, logoForbidden=c.logo==='forbidden', canLogo=IMG.logo && !logoForbidden;
+  const c=CAPSULES.find(x=>x.id===activeId), s=ST[c.id], lf=s.logoFx;
+  const hasBg=bgOf(c) && !c.logoOnly, logoForbidden=c.logo==='forbidden', canLogo=logoOf(c) && !logoForbidden;
+  const showLogoStyle = logoOf(c) && !logoForbidden && s.includeLogo;
   let logoToggle='';
   if(logoForbidden){
     logoToggle=`<div class="note">Steam forbids logos/text on the Library Hero — upload the logo separately as the <b>Library Logo</b>. The dashed box is the 860×380 safe area.</div>`;
   } else if(c.logoOnly){
     logoToggle=`<div class="note info">Library Logo is the logo alone on a transparent background — always exported as PNG. The background image is ignored here.</div>`;
   } else {
-    logoToggle=`<label class="toggle"><input type="checkbox" id="incLogo" ${s.includeLogo?'checked':''} ${IMG.logo?'':'disabled'}/> Include logo on this capsule</label>`;
+    logoToggle=`<label class="toggle"><input type="checkbox" id="incLogo" ${s.includeLogo?'checked':''} ${logoOf(c)?'':'disabled'}/> Include logo on this capsule</label>`;
   }
   controls.innerHTML=`
     <h3>${c.name}</h3>
@@ -595,6 +648,14 @@ function buildControls(){
       <button id="tabLogo" class="${activeLayer==='logo'?'active':''}" ${canLogo&&s.includeLogo?'':'disabled'}>Logo</button>
     </div>
     <div class="section" id="layerCtl"></div>
+    <div class="section">
+      <h4>Images — this capsule</h4>
+      ${c.logoOnly?'':`<div class="img-ovr"><span>Background${s.bgImg?' <em>(custom)</em>':''}</span><button id="ovrBg">${s.bgImg?'Replace…':'Override…'}</button>${s.bgImg?'<button id="ovrBgClear">Shared</button>':''}</div>`}
+      ${logoForbidden?'':`<div class="img-ovr"><span>Logo${s.logoImg?' <em>(custom)</em>':''}</span><button id="ovrLogo">${s.logoImg?'Replace…':'Override…'}</button>${s.logoImg?'<button id="ovrLogoClear">Shared</button>':''}</div>`}
+      <input type="file" id="ovrBgInput" accept="image/*" hidden>
+      <input type="file" id="ovrLogoInput" accept="image/*" hidden>
+      <div class="sub" style="margin:6px 0 0">Use a different image for just this capsule (e.g. a wide shot for the Hero).</div>
+    </div>
     <div class="section">
       <h4>Background fit</h4>
       <div class="btn-grid">
@@ -624,6 +685,24 @@ function buildControls(){
         <button data-a="center">Center</button>
       </div>
     </div>
+    ${showLogoStyle?`
+    <div class="section">
+      <h4>Logo style</h4>
+      <label class="toggle"><input type="checkbox" id="shOn" ${lf.shadowOn?'checked':''}/> Drop shadow</label>
+      ${lf.shadowOn?`
+        <div class="row"><label>Blur</label><input type="range" id="shBlur" min="0" max="60" value="${lf.shadowBlur}"><span class="scale-val">${lf.shadowBlur}</span></div>
+        <div class="row"><label>Offset</label><input type="range" id="shDist" min="0" max="60" value="${lf.shadowDist}"><span class="scale-val">${lf.shadowDist}</span></div>
+        <div class="row"><label>Opacity</label><input type="range" id="shOp" min="0" max="100" value="${lf.shadowOpacity}"><span class="scale-val">${lf.shadowOpacity}%</span></div>
+        <div class="row"><label>Colour</label><input type="color" id="shCol" value="${lf.shadowColor}"></div>`:''}
+      <label class="toggle"><input type="checkbox" id="olOn" ${lf.outlineOn?'checked':''}/> Outline</label>
+      ${lf.outlineOn?`
+        <div class="row"><label>Width</label><input type="range" id="olW" min="1" max="40" value="${lf.outlineWidth}"><span class="scale-val">${lf.outlineWidth}</span></div>
+        <div class="row"><label>Colour</label><input type="color" id="olCol" value="${lf.outlineColor}"></div>`:''}
+      <label class="toggle"><input type="checkbox" id="glOn" ${lf.glowOn?'checked':''}/> Glow</label>
+      ${lf.glowOn?`
+        <div class="row"><label>Blur</label><input type="range" id="glBlur" min="0" max="80" value="${lf.glowBlur}"><span class="scale-val">${lf.glowBlur}</span></div>
+        <div class="row"><label>Colour</label><input type="color" id="glCol" value="${lf.glowColor}"></div>`:''}
+    </div>`:''}
     <div class="section">
       <h4>Export</h4>
       <div class="dl-row"><button class="action" id="dlOne">⬇ Download this</button></div>
@@ -638,9 +717,30 @@ function buildControls(){
   wire('#bgCover',()=>{fitBg(c,'cover');clampBg(c);drawStage();syncControls();});
   wire('#bgReset',()=>{s.bg.init=false;ensureBgInit(c);drawStage();syncControls();});
   controls.querySelectorAll('[data-a]').forEach(b=>b.addEventListener('click',()=>{
-    if(!IMG.logo||logoForbidden){toast('No logo to anchor');return;}
+    if(!logoOf(c)||logoForbidden){toast('No logo to anchor');return;}
     s.logo.anchor=b.dataset.a; applyAnchor(c); drawStage(); syncControls();
   }));
+  // per-capsule image overrides
+  const ovrLoad=slot=>ev=>{ const file=ev.target.files[0]; if(!file)return;
+    const img=new Image(); img.onload=()=>{ const obj={img,w:img.naturalWidth,h:img.naturalHeight};
+      if(slot==='bg'){ s.bgImg=obj; s.bg.init=false; } else { s.logoImg=obj; s.logo.init=false; }
+      refreshAll(); toast('Custom '+slot+' set for '+c.name); };
+    img.src=URL.createObjectURL(file); };
+  $('#ovrBgInput')&&$('#ovrBgInput').addEventListener('change',ovrLoad('bg'));
+  $('#ovrLogoInput')&&$('#ovrLogoInput').addEventListener('change',ovrLoad('logo'));
+  wire('#ovrBg',()=>$('#ovrBgInput').click());
+  wire('#ovrLogo',()=>$('#ovrLogoInput').click());
+  wire('#ovrBgClear',()=>{ s.bgImg=null; s.bg.init=false; refreshAll(); toast('Using shared background'); });
+  wire('#ovrLogoClear',()=>{ s.logoImg=null; s.logo.init=false; refreshAll(); toast('Using shared logo'); });
+  // logo style (shadow / outline / glow)
+  const bindTog=(id,key)=>{const el=$(id); if(el)el.addEventListener('change',()=>{ lf[key]=el.checked; buildControls(); drawStage(); });};
+  const bindLF=(id,key,fmt)=>{const el=$(id); if(!el)return; el.addEventListener('input',()=>{
+    lf[key]= el.type==='color' ? el.value : parseInt(el.value,10);
+    const sp=el.parentElement.querySelector('.scale-val'); if(sp) sp.textContent= fmt?fmt(el.value):el.value;
+    drawStage(); });};
+  bindTog('#shOn','shadowOn'); bindLF('#shBlur','shadowBlur'); bindLF('#shDist','shadowDist'); bindLF('#shOp','shadowOpacity',v=>v+'%'); bindLF('#shCol','shadowColor');
+  bindTog('#olOn','outlineOn'); bindLF('#olW','outlineWidth'); bindLF('#olCol','outlineColor');
+  bindTog('#glOn','glowOn'); bindLF('#glBlur','glowBlur'); bindLF('#glCol','glowColor');
   // background effects
   controls.querySelectorAll('.fxR').forEach(r=>{
     const k=r.dataset.k, f=FX.find(x=>x.k===k);
@@ -711,12 +811,12 @@ async function downloadOne(c,prefix){
   a.click(); URL.revokeObjectURL(a.href); toast('Saved '+name);
 }
 async function downloadAll(prefix){
-  if(!IMG.bg && !IMG.logo){toast('Nothing to export');return;}
+  if(!anyImages()){toast('Nothing to export');return;}
   toast('Rendering all capsules…');
   const zip=new JSZip();
   for(const c of CAPSULES){
-    if(c.logoOnly && !IMG.logo) continue;
-    if(!c.logoOnly && !IMG.bg && !(IMG.logo && ST[c.id].includeLogo)) continue;
+    if(c.logoOnly && !logoOf(c)) continue;
+    if(!c.logoOnly && !bgOf(c) && !(logoOf(c) && ST[c.id].includeLogo)) continue;
     zip.file(fname(c,prefix), await canvasBlob(c,renderToCanvas(c)));
   }
   const out=await zip.generateAsync({type:'blob'});
@@ -776,7 +876,7 @@ function openPreview(){
   $('#modal').classList.add('open');
 }
 function closePreview(){ $('#modal').classList.remove('open'); }
-$('#pvOpen').addEventListener('click',()=>{ if(IMG.bg||IMG.logo) openPreview(); });
+$('#pvOpen').addEventListener('click',()=>{ if(anyImages()) openPreview(); });
 $('#pvClose').addEventListener('click',closePreview);
 $('#pvDl').addEventListener('click',()=>openExport(null));
 $('#modal').addEventListener('click',e=>{ if(e.target.id==='modal') closePreview(); });
@@ -787,7 +887,7 @@ document.addEventListener('keydown',e=>{ if(e.key!=='Escape')return;
 
 /* ---------- Refresh ---------- */
 function refreshAll(){
-  const has=IMG.bg||IMG.logo;
+  const has=anyImages();
   $('#dlAll').disabled=!has;
   $('#pvOpen').disabled=!has;
   emptyHint.style.display=has?'none':'block';
@@ -797,7 +897,7 @@ function refreshAll(){
   if(has){ buildControls(); drawStage(); }
 }
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),2200);}
-window.addEventListener('resize',()=>{ if(IMG.bg||IMG.logo) drawStage(); });
+window.addEventListener('resize',()=>{ if(anyImages()) drawStage(); });
 
 /* ---------- Welcome / tutorial ---------- */
 function openWelcome(){ $('#welcome').classList.add('open'); }
