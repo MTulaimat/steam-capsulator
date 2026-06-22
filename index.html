@@ -24,7 +24,8 @@
   }
   header h1{font-size:16px;margin:0;color:#fff;font-weight:600;letter-spacing:.3px}
   header h1 span{color:var(--accent)}
-  .ver{color:var(--muted);font-size:10px;opacity:.55;align-self:flex-end;margin:0 0 3px -6px;letter-spacing:.5px}
+  .brand{position:relative;align-self:center}
+  .ver{position:absolute;left:1px;top:100%;margin-top:-5px;color:var(--muted);font-size:10px;opacity:.55;letter-spacing:.5px;white-space:nowrap;pointer-events:none}
   .uploads{display:flex;gap:10px;align-items:center}
   .upload-btn{
     display:flex;flex-direction:column;gap:2px;background:var(--panel);
@@ -197,8 +198,7 @@
 </head>
 <body>
 <header>
-  <h1>Steam<span>Capsulator</span></h1>
-  <span class="ver" id="ver"></span>
+  <div class="brand"><h1>Steam<span>Capsulator</span></h1><span class="ver" id="ver"></span></div>
   <div class="uploads">
     <label class="upload-btn hint" id="bgBtn">
       <b>① Background</b><small id="bgName">Click / drop image</small>
@@ -294,7 +294,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = '0.6';
+const APP_VERSION = '0.8';
 
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
