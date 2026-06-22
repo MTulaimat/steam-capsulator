@@ -114,7 +114,37 @@
   .pv-meta small{color:var(--muted);font-size:11px}
   .pv-group{grid-column:1/-1;color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--line);padding-bottom:4px;margin-top:6px}
   #exportModal{align-items:center;justify-content:center;z-index:60}
-  .dialog{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:22px;width:min(440px,90vw);box-shadow:0 10px 40px rgba(0,0,0,.6)}
+  .dialog{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:22px;width:min(440px,90vw);max-height:92vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+  .dialog.wide{width:min(580px,94vw)}
+  /* welcome / tutorial */
+  #welcome{align-items:center;justify-content:center;z-index:70}
+  .demo{display:flex;justify-content:center;margin-bottom:16px}
+  .demo-frame{position:relative;width:240px;height:140px;border-radius:8px;overflow:hidden;border:1px solid var(--line);box-shadow:0 6px 24px rgba(0,0,0,.5)}
+  .demo-art{position:absolute;inset:0;animation:demoPan 7s ease-in-out infinite;
+    background:radial-gradient(120% 80% at 62% 18%, rgba(255,238,196,.55), rgba(0,0,0,0) 46%),
+    linear-gradient(180deg,#3b5a2f,#1d3b46 58%,#10202b)}
+  .demo-logo{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);padding:5px 12px;border-radius:8px;
+    background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:11px;font-weight:700;letter-spacing:1px;
+    animation:demoLogoIn 7s ease-in-out infinite}
+  @keyframes demoPan{0%{transform:scale(1.12) translate(-3%,-2%)}50%{transform:scale(1.24) translate(3%,2%)}100%{transform:scale(1.12) translate(-3%,-2%)}}
+  @keyframes demoLogoIn{0%,12%{opacity:0;transform:translate(-50%,12px) scale(.85)}38%,88%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,12px) scale(.85)}}
+  .steps{display:flex;flex-direction:column;gap:10px;margin:6px 0 4px}
+  .step{display:flex;gap:12px;align-items:flex-start}
+  .step-n{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:var(--accent2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+  .step b{display:block;color:#dfe9f1;font-size:13px}
+  .step small{color:var(--muted);font-size:12px;line-height:1.45}
+  .welcome-foot{margin-top:12px;color:var(--muted);font-size:12px;text-align:center}
+  .welcome-foot b{color:var(--accent)}
+  .modal.open .step{animation:stepIn .45s ease both}
+  .modal.open .step:nth-child(1){animation-delay:.05s}
+  .modal.open .step:nth-child(2){animation-delay:.13s}
+  .modal.open .step:nth-child(3){animation-delay:.21s}
+  .modal.open .step:nth-child(4){animation-delay:.29s}
+  @keyframes stepIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion: reduce){
+    .demo-art,.demo-logo,.modal.open .step{animation:none}
+    .demo-logo{opacity:1}
+  }
   .dialog h2{margin:0 0 6px;font-size:16px;color:#fff;font-weight:600}
   .dialog p{margin:0 0 14px;color:var(--muted);font-size:13px}
   .dialog input[type=text]{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:10px 12px;font-size:14px}
@@ -147,6 +177,7 @@
       <option value="jpg">JPG</option>
     </select>
   </div>
+  <button class="action ghost" id="helpBtn" title="How it works">?</button>
   <button class="action ghost" id="clearLogo" title="Remove the logo from all capsules">No logo</button>
   <button class="action ghost" id="pvOpen" disabled>▦ Preview all</button>
   <button class="action" id="dlAll" disabled>⬇ Download all (.zip)</button>
@@ -191,6 +222,29 @@
       <button class="action ghost" id="exportCancel">Cancel</button>
       <button class="action" id="exportGo">⬇ Export</button>
     </div>
+  </div>
+</div>
+
+<div class="modal welcome" id="welcome">
+  <div class="dialog wide">
+    <div class="demo" aria-hidden="true">
+      <div class="demo-frame">
+        <div class="demo-art"></div>
+        <div class="demo-logo">YOUR LOGO</div>
+      </div>
+    </div>
+    <h2>Welcome to Steam Capsulator</h2>
+    <p>Generate every Steam store &amp; library capsule image from one background and an optional logo — crop, refine, and export in seconds.</p>
+    <div class="steps">
+      <div class="step"><span class="step-n">1</span><div><b>Upload</b><small>Add a background image. Optionally add a logo — or skip it if your art already includes one.</small></div></div>
+      <div class="step"><span class="step-n">2</span><div><b>Refine each size</b><small>Pick a capsule on the left, then drag / scroll to position it, and apply background effects like blur, tint &amp; vignette.</small></div></div>
+      <div class="step"><span class="step-n">3</span><div><b>Preview all</b><small>Open “Preview all” to see every capsule side by side and jump straight to any one.</small></div></div>
+      <div class="step"><span class="step-n">4</span><div><b>Export</b><small>Download a single image or all as a ZIP, with an optional filename prefix. Names match each Steam size.</small></div></div>
+    </div>
+    <div class="dialog-actions">
+      <button class="action" id="welcomeGo">Get started →</button>
+    </div>
+    <div class="welcome-foot">Reopen this anytime from the <b>?</b> button in the top bar.</div>
   </div>
 </div>
 
@@ -632,7 +686,10 @@ $('#pvOpen').addEventListener('click',()=>{ if(IMG.bg||IMG.logo) openPreview(); 
 $('#pvClose').addEventListener('click',closePreview);
 $('#pvDl').addEventListener('click',()=>openExport(null));
 $('#modal').addEventListener('click',e=>{ if(e.target.id==='modal') closePreview(); });
-document.addEventListener('keydown',e=>{ if(e.key!=='Escape')return; if($('#exportModal').classList.contains('open'))closeExport(); else closePreview(); });
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape')return;
+  if($('#welcome').classList.contains('open'))closeWelcome();
+  else if($('#exportModal').classList.contains('open'))closeExport();
+  else closePreview(); });
 
 /* ---------- Refresh ---------- */
 function refreshAll(){
@@ -647,6 +704,15 @@ function refreshAll(){
 }
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),2200);}
 window.addEventListener('resize',()=>{ if(IMG.bg||IMG.logo) drawStage(); });
+
+/* ---------- Welcome / tutorial ---------- */
+function openWelcome(){ $('#welcome').classList.add('open'); }
+function closeWelcome(){ $('#welcome').classList.remove('open'); try{localStorage.setItem('sc_intro_seen','1');}catch(e){} }
+$('#helpBtn').addEventListener('click',openWelcome);
+$('#welcomeGo').addEventListener('click',closeWelcome);
+$('#welcome').addEventListener('click',e=>{ if(e.target.id==='welcome')closeWelcome(); });
+try{ if(!localStorage.getItem('sc_intro_seen')) openWelcome(); }catch(e){ openWelcome(); }
+
 buildSidebar();
 </script>
 </body>
