@@ -427,12 +427,32 @@ function displayScale(c){
   const maxW=Math.min(editor.clientWidth-40, 760), maxH=editor.clientHeight-80;
   return Math.min(maxW/c.w, maxH/c.h, 2);
 }
+function drawSelection(c,sf){
+  // logo box: bright when selected, faint (but present) otherwise so it reads as clickable
+  if(logoVisible(c)){
+    const l=ST[c.id].logo, x=l.x*sf, y=l.y*sf, w=IMG.logo.w*l.scale*sf, h=IMG.logo.h*l.scale*sf;
+    ctx.lineWidth=1.5;
+    if(activeLayer==='logo'){ ctx.strokeStyle='rgba(102,192,244,.95)'; ctx.setLineDash([6,4]); }
+    else { ctx.strokeStyle='rgba(255,255,255,.3)'; ctx.setLineDash([4,5]); }
+    ctx.strokeRect(x,y,w,h); ctx.setLineDash([]);
+    if(activeLayer==='logo'){
+      ctx.fillStyle='rgba(102,192,244,.95)';
+      [[x,y],[x+w,y],[x,y+h],[x+w,y+h]].forEach(p=>ctx.fillRect(p[0]-3,p[1]-3,6,6));
+    }
+  }
+  // background selected: dashed inset frame
+  if(activeLayer==='bg' && IMG.bg && !c.logoOnly){
+    ctx.strokeStyle='rgba(102,192,244,.85)'; ctx.lineWidth=2; ctx.setLineDash([10,6]);
+    ctx.strokeRect(2,2,stage.width-4,stage.height-4); ctx.setLineDash([]);
+  }
+}
 function drawStage(){
   const c=CAPSULES.find(x=>x.id===activeId), sf=displayScale(c);
   stage.width=Math.round(c.w*sf); stage.height=Math.round(c.h*sf);
   render(c,ctx,sf,false);
+  drawSelection(c,sf);
   const layerTxt = activeLayer==='bg'?'Background':'Logo';
-  stageInfo.innerHTML = `<b>${c.name}</b> — ${c.w}×${c.h}px &nbsp;·&nbsp; editing <b>${layerTxt}</b> &nbsp;·&nbsp; drag to move, scroll to zoom`;
+  stageInfo.innerHTML = `<b>${c.name}</b> — ${c.w}×${c.h}px &nbsp;·&nbsp; <b>click</b> the logo or background to select &nbsp;·&nbsp; editing <b>${layerTxt}</b> &nbsp;·&nbsp; drag to move, scroll to zoom`;
 }
 
 /* ---------- Interaction ---------- */
@@ -444,14 +464,29 @@ function layerEditable(){
   if(activeLayer==='bg') return IMG.bg && !c.logoOnly;
   return IMG.logo && ST[c.id].includeLogo && c.logo!=='forbidden';
 }
+function logoVisible(c){ return IMG.logo && ST[c.id].includeLogo && c.logo!=='forbidden'; }
+function pointHitsLogo(c,e){
+  if(!logoVisible(c)) return false;
+  const sf=displayScale(c), rect=stage.getBoundingClientRect();
+  const px=(e.clientX-rect.left)/sf, py=(e.clientY-rect.top)/sf, l=ST[c.id].logo;
+  return px>=l.x && px<=l.x+IMG.logo.w*l.scale && py>=l.y && py<=l.y+IMG.logo.h*l.scale;
+}
 stage.addEventListener('pointerdown',e=>{
-  if(!layerEditable())return;
   const c=CAPSULES.find(x=>x.id===activeId);
+  // pick the layer from where you clicked: logo if you hit it, otherwise background
+  let want = c.logoOnly ? 'logo' : (pointHitsLogo(c,e) ? 'logo' : (IMG.bg ? 'bg' : (logoVisible(c)?'logo':activeLayer)));
+  if(want!==activeLayer){ activeLayer=want; buildControls(); }
+  if(!layerEditable()){ drawStage(); return; }
   drag={x:e.clientX,y:e.clientY,sf:displayScale(c)};
   stage.classList.add('dragging'); stage.setPointerCapture(e.pointerId);
+  drawStage();
 });
 stage.addEventListener('pointermove',e=>{
-  if(!drag)return;
+  if(!drag){
+    const c=CAPSULES.find(x=>x.id===activeId);
+    stage.style.cursor = (pointHitsLogo(c,e) && activeLayer!=='logo') ? 'pointer' : 'grab';
+    return;
+  }
   const l=activeLayerState();
   l.x+=(e.clientX-drag.x)/drag.sf; l.y+=(e.clientY-drag.y)/drag.sf;
   drag.x=e.clientX; drag.y=e.clientY;
