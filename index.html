@@ -314,12 +314,18 @@
 
 <div class="modal" id="resizeModal">
   <div class="dialog">
-    <h2 id="rzTitle">Resize capsule</h2>
+    <h2 id="rzTitle">Capsule settings</h2>
     <p>Set a custom size for this capsule. The background and logo refit automatically.</p>
     <div class="size-row" style="border:0;padding:0">
       <input type="number" min="1" id="rzW"><span class="x">×</span><input type="number" min="1" id="rzH"><span class="x">px</span>
     </div>
     <div class="preview-name" id="rzDefault"></div>
+    <div class="img-ovr" id="rzBgRow" style="margin-top:14px">
+      <span>Background<em id="rzBgState"></em></span>
+      <button id="rzBgBtn">Override…</button>
+      <button id="rzBgClear">Shared</button>
+    </div>
+    <input type="file" id="rzBgInput" accept="image/*" hidden>
     <div class="dialog-actions">
       <button class="action ghost" id="rzReset">Default</button>
       <button class="action ghost" id="rzCancel">Cancel</button>
@@ -357,7 +363,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = '1.7';
+const APP_VERSION = '1.8';
 
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
@@ -1027,10 +1033,23 @@ $('#sizeModal').addEventListener('click',e=>{ if(e.target.id==='sizeModal')close
 let resizeId=null;
 function openResize(id){
   resizeId=id; const c=CAPSULES.find(x=>x.id===id), d=DEFAULT_SIZE[id];
-  $('#rzTitle').textContent='Resize — '+c.name;
+  $('#rzTitle').textContent='Settings — '+c.name;
   $('#rzW').value=c.w; $('#rzH').value=c.h;
   $('#rzDefault').innerHTML='Default: <b>'+d.w+'×'+d.h+'</b>';
+  syncResizeBg();
   $('#resizeModal').classList.add('open'); setTimeout(()=>$('#rzW').select(),0);
+}
+// reflect this capsule's background-override state in the settings modal
+function syncResizeBg(){
+  const c=CAPSULES.find(x=>x.id===resizeId); if(!c)return;
+  const s=ST[c.id], row=$('#rzBgRow');
+  // Library Logo ignores the background entirely — no override there
+  if(c.logoOnly){ row.style.display='none'; return; }
+  row.style.display='';
+  const custom=!!s.bgImg;
+  $('#rzBgState').textContent=custom?' (custom)':'';
+  $('#rzBgBtn').textContent=custom?'Replace…':'Override…';
+  $('#rzBgClear').style.display=custom?'':'none';
 }
 function closeResize(){ $('#resizeModal').classList.remove('open'); resizeId=null; }
 function applyResize(){
@@ -1041,6 +1060,21 @@ function applyResize(){
 $('#rzGo').addEventListener('click',applyResize);
 $('#rzCancel').addEventListener('click',closeResize);
 $('#rzReset').addEventListener('click',()=>{ const d=DEFAULT_SIZE[resizeId]; $('#rzW').value=d.w; $('#rzH').value=d.h; });
+// per-capsule background override (settings modal)
+$('#rzBgBtn').addEventListener('click',()=>$('#rzBgInput').click());
+$('#rzBgInput').addEventListener('change',ev=>{
+  const c=CAPSULES.find(x=>x.id===resizeId); if(!c)return;
+  const file=ev.target.files[0]; if(!file)return;
+  const img=new Image(); img.onload=()=>{
+    const s=ST[c.id]; s.bgImg={img,w:img.naturalWidth,h:img.naturalHeight}; s.bg.init=false;
+    ev.target.value=''; syncResizeBg(); refreshAll(); toast('Custom background set for '+c.name);
+  };
+  img.src=URL.createObjectURL(file);
+});
+$('#rzBgClear').addEventListener('click',()=>{
+  const c=CAPSULES.find(x=>x.id===resizeId); if(!c)return;
+  const s=ST[c.id]; s.bgImg=null; s.bg.init=false; syncResizeBg(); refreshAll(); toast('Using shared background');
+});
 $('#resizeModal').addEventListener('keydown',e=>{ if(e.key==='Enter')applyResize(); });
 $('#resizeModal').addEventListener('click',e=>{ if(e.target.id==='resizeModal')closeResize(); });
 
