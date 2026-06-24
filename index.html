@@ -201,6 +201,25 @@
   .preview-name{margin-top:10px;font-size:12px;color:var(--muted);word-break:break-all;min-height:16px}
   .preview-name b{color:var(--accent)}
   .dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+  /* logo creator */
+  button.upload-btn{font:inherit;text-align:left;color:var(--text)}
+  .lc-open b{color:var(--accent)}
+  #logoModal{align-items:center;justify-content:center;z-index:65}
+  .lc-grid{display:grid;grid-template-columns:1fr;gap:14px}
+  @media(min-width:700px){ .lc-grid{grid-template-columns:300px 1fr} }
+  .lc-preview{background:repeating-conic-gradient(#2a3340 0% 25%, #232b36 0% 50%) 50%/18px 18px;border:1px solid var(--line);border-radius:8px;min-height:200px;display:flex;align-items:center;justify-content:center;padding:12px;overflow:hidden}
+  .lc-preview canvas{max-width:100%;max-height:260px;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5))}
+  .lc-controls{display:flex;flex-direction:column}
+  .lc-row{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:12px;color:var(--text)}
+  .lc-row .lab{flex:0 0 58px;color:var(--muted)}
+  .lc-row .tog{flex:0 0 96px;display:flex;align-items:center;gap:6px;color:var(--text);cursor:pointer;user-select:none}
+  .lc-row input[type=text]{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:7px 9px;font-size:13px}
+  .lc-row input[type=text]:focus,.lc-row select:focus{outline:none;border-color:var(--accent)}
+  .lc-row input[type=range]{flex:1;min-width:40px;accent-color:var(--accent)}
+  .lc-row input[type=color]{flex:0 0 auto;width:34px;height:26px;padding:0;border:1px solid var(--line);border-radius:5px;background:var(--panel);cursor:pointer}
+  .lc-row select{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 8px;font-size:12px}
+  .lc-row input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;flex:0 0 auto}
+  .lc-sep{border:0;border-top:1px solid var(--line);margin:6px 0 11px}
   #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#16202d;border:1px solid var(--line);color:#fff;padding:10px 18px;border-radius:6px;opacity:0;transition:.25s;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.5)}
   #toast.show{opacity:1}
 
@@ -243,6 +262,9 @@
       <b>② Logo <span class="badge">optional</span></b><small id="logoName">Skip if bg has logo</small>
       <input type="file" id="logoInput" accept="image/*" />
     </label>
+    <button type="button" class="upload-btn lc-open" id="logoCreateBtn" title="Create a text logo">
+      <b>✎ Logo Creator</b><small>Make a text logo</small>
+    </button>
   </div>
   <div class="spacer"></div>
   <div class="fmt">
@@ -334,6 +356,34 @@
   </div>
 </div>
 
+<div class="modal" id="logoModal">
+  <div class="dialog" style="width:min(780px,95vw)">
+    <h2>Logo Creator</h2>
+    <p>Design a text logo — tweak the style or hit randomize, then Apply to use it across every capsule (instead of uploading one).</p>
+    <div class="lc-grid">
+      <div class="lc-preview" id="lcPreview"><canvas id="lcCanvas"></canvas></div>
+      <div class="lc-controls">
+        <div class="lc-row"><span class="lab">Line 1</span><input type="text" id="lcLine1" maxlength="40" placeholder="Game title"></div>
+        <div class="lc-row"><span class="lab">Line 2</span><input type="text" id="lcLine2" maxlength="40" placeholder="Subtitle (optional)"></div>
+        <div class="lc-row"><span class="lab">Font</span><select id="lcFont"></select><select id="lcWeight" style="flex:0 0 92px">
+          <option value="400">Normal</option><option value="700">Bold</option><option value="900">Black</option></select></div>
+        <div class="lc-row"><span class="lab">Size</span><input type="range" id="lcSize" min="40" max="240" step="2"><label class="tog" style="flex:0 0 auto"><input type="checkbox" id="lcUpper"> UPPER</label></div>
+        <div class="lc-row"><span class="lab">Spacing</span><input type="range" id="lcSpacing" min="-5" max="30" step="1"></div>
+        <div class="lc-row"><span class="lab">Color</span><input type="color" id="lcColor"><label class="tog" style="flex:1"><input type="checkbox" id="lcGrad"> Gradient</label><input type="color" id="lcColor2"></div>
+        <hr class="lc-sep">
+        <div class="lc-row"><label class="tog"><input type="checkbox" id="lcOutline"> Outline</label><input type="range" id="lcOutlineW" min="1" max="20" step="1"><input type="color" id="lcOutlineColor"></div>
+        <div class="lc-row"><label class="tog"><input type="checkbox" id="lcShadow"> Shadow</label><input type="range" id="lcShadowBlur" min="0" max="40" step="1"><input type="range" id="lcShadowDist" min="0" max="24" step="1"><input type="color" id="lcShadowColor"></div>
+        <div class="lc-row"><label class="tog"><input type="checkbox" id="lcPlate"> Plate</label><input type="range" id="lcPlateOpacity" min="0" max="100" step="5"><input type="color" id="lcPlateColor"></div>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button class="action ghost" id="lcRandom" style="margin-right:auto">🎲 Randomize</button>
+      <button class="action ghost" id="lcCancel">Cancel</button>
+      <button class="action" id="lcApply">Apply logo</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal welcome" id="welcome">
   <div class="dialog wide">
     <div class="demo" aria-hidden="true">
@@ -363,7 +413,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = '1.8';
+const APP_VERSION = '1.9';
 
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
@@ -985,7 +1035,8 @@ $('#pvClose').addEventListener('click',closePreview);
 $('#pvDl').addEventListener('click',()=>openExport(null));
 $('#modal').addEventListener('click',e=>{ if(e.target.id==='modal') closePreview(); });
 document.addEventListener('keydown',e=>{ if(e.key!=='Escape')return;
-  if($('#resizeModal').classList.contains('open'))closeResize();
+  if($('#logoModal').classList.contains('open'))closeLogoCreator();
+  else if($('#resizeModal').classList.contains('open'))closeResize();
   else if($('#sizeModal').classList.contains('open'))closeSizeModal();
   else if($('#welcome').classList.contains('open'))closeWelcome();
   else if($('#exportModal').classList.contains('open'))closeExport();
@@ -1091,6 +1142,145 @@ function refreshAll(){
 }
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),2200);}
 window.addEventListener('resize',()=>{ if(anyImages()) drawStage(); });
+
+/* ---------- Logo Creator (text → logo) ---------- */
+const LOGO_FONTS = [
+  {label:'Impact',      css:'Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif'},
+  {label:'Arial Black', css:'"Arial Black", Gadget, sans-serif'},
+  {label:'Segoe UI',    css:'"Segoe UI", Roboto, Arial, sans-serif'},
+  {label:'Trebuchet',   css:'"Trebuchet MS", Helvetica, sans-serif'},
+  {label:'Verdana',     css:'Verdana, Geneva, sans-serif'},
+  {label:'Tahoma',      css:'Tahoma, Geneva, sans-serif'},
+  {label:'Georgia',     css:'Georgia, "Times New Roman", serif'},
+  {label:'Times',       css:'"Times New Roman", Times, serif'},
+  {label:'Courier',     css:'"Courier New", Courier, monospace'},
+  {label:'Comic Sans',  css:'"Comic Sans MS", "Comic Sans", cursive'},
+];
+const LC = {
+  line1:'GAME TITLE', line2:'', font:0, weight:'900', size:120, spacing:2, upper:true,
+  color:'#ffffff', grad:false, color2:'#66c0f4',
+  outlineOn:true, outlineW:6, outlineColor:'#0e1419',
+  shadowOn:true, shadowBlur:14, shadowDist:6, shadowColor:'#000000',
+  plateOn:false, plateColor:'#000000', plateOpacity:40,
+};
+function hslToHex(h,s,l){ s/=100; l/=100;
+  const a=s*Math.min(l,1-l), f=n=>{const k=(n+h/30)%12, c=l-a*Math.max(-1,Math.min(k-3,9-k,1));
+    return Math.round(255*c).toString(16).padStart(2,'0');};
+  return '#'+f(0)+f(8)+f(4);
+}
+function roundRectPath(g,x,y,w,h,r){ r=Math.min(r,w/2,h/2);
+  g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
+  g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath();
+}
+function trimCanvas(cv){
+  const g=cv.getContext('2d'), w=cv.width, h=cv.height, d=g.getImageData(0,0,w,h).data;
+  let top=h,left=w,right=0,bottom=0,found=false;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){ if(d[(y*w+x)*4+3]>4){
+    found=true; if(x<left)left=x; if(x>right)right=x; if(y<top)top=y; if(y>bottom)bottom=y; } }
+  if(!found) return cv;
+  const pad=Math.round(Math.max(w,h)*0.015);
+  left=Math.max(0,left-pad); top=Math.max(0,top-pad); right=Math.min(w-1,right+pad); bottom=Math.min(h-1,bottom+pad);
+  const nw=right-left+1, nh=bottom-top+1, out=document.createElement('canvas');
+  out.width=nw; out.height=nh; out.getContext('2d').drawImage(cv,left,top,nw,nh,0,0,nw,nh);
+  return out;
+}
+function renderTextLogo(scale){
+  scale=scale||1; const o=LC, fam=(LOGO_FONTS[o.font]||LOGO_FONTS[0]).css, sp=o.spacing*scale;
+  const cap=s=>o.upper?s.toUpperCase():s;
+  const lines=[];
+  if(o.line1.trim()) lines.push({t:cap(o.line1), size:o.size*scale});
+  if(o.line2.trim()) lines.push({t:cap(o.line2), size:o.size*0.5*scale});
+  if(!lines.length) lines.push({t:cap(o.line1)||' ', size:o.size*scale});
+  const m=document.createElement('canvas').getContext('2d');
+  let maxW=1;
+  lines.forEach(L=>{ m.font=`${o.weight} ${L.size}px ${fam}`; m.letterSpacing=sp+'px';
+    L.w=m.measureText(L.t).width+Math.max(0,sp); L.h=L.size*1.28; if(L.w>maxW)maxW=L.w; });
+  const gap=lines.length>1 ? o.size*scale*0.16 : 0;
+  const textH=lines.reduce((a,L)=>a+L.h,0)+gap*(lines.length-1);
+  const extra=(o.outlineOn?o.outlineW*scale:0)+(o.shadowOn?(o.shadowBlur+o.shadowDist)*scale:0);
+  const pad=o.size*scale*0.32+extra+18*scale;
+  const W=Math.max(2,Math.ceil(maxW+pad*2)), H=Math.max(2,Math.ceil(textH+pad*2));
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const g=cv.getContext('2d'); g.textAlign='center'; g.textBaseline='middle';
+  if(o.plateOn){ g.fillStyle=hexA(o.plateColor,o.plateOpacity/100);
+    const m2=pad*0.45; roundRectPath(g,m2,m2,W-m2*2,H-m2*2,Math.min(W,H)*0.06); g.fill(); }
+  let y=pad+lines[0].h/2;
+  lines.forEach((L,i)=>{
+    g.font=`${o.weight} ${L.size}px ${fam}`; g.letterSpacing=sp+'px'; const cx=W/2;
+    if(o.shadowOn){ g.save(); g.shadowColor=hexA(o.shadowColor,.9); g.shadowBlur=o.shadowBlur*scale;
+      g.shadowOffsetX=0; g.shadowOffsetY=o.shadowDist*scale; g.fillStyle='#000'; g.fillText(L.t,cx,y); g.restore(); }
+    if(o.outlineOn && o.outlineW>0){ g.lineWidth=o.outlineW*scale*2; g.strokeStyle=o.outlineColor;
+      g.lineJoin='round'; g.miterLimit=2; g.strokeText(L.t,cx,y); }
+    if(o.grad){ const gr=g.createLinearGradient(0,y-L.size/2,0,y+L.size/2);
+      gr.addColorStop(0,o.color); gr.addColorStop(1,o.color2); g.fillStyle=gr; }
+    else g.fillStyle=o.color;
+    g.fillText(L.t,cx,y);
+    y+=L.h/2+gap+(lines[i+1]?lines[i+1].h/2:0);
+  });
+  return trimCanvas(cv);
+}
+function updateLogoPreview(){
+  const cv=renderTextLogo(1.5), host=$('#lcPreview'), pc=$('#lcCanvas');
+  const maxW=Math.max(80,host.clientWidth-28), maxH=240;
+  const r=Math.min(maxW/cv.width, maxH/cv.height, 1);
+  pc.width=Math.max(1,Math.round(cv.width*r)); pc.height=Math.max(1,Math.round(cv.height*r));
+  const g=pc.getContext('2d'); g.imageSmoothingQuality='high';
+  g.clearRect(0,0,pc.width,pc.height); g.drawImage(cv,0,0,pc.width,pc.height);
+}
+function syncLogoControls(){
+  const set=(id,v)=>{const e=$(id); if(!e)return; if(e.type==='checkbox')e.checked=v; else e.value=v;};
+  set('#lcLine1',LC.line1); set('#lcLine2',LC.line2); set('#lcFont',LC.font); set('#lcWeight',LC.weight);
+  set('#lcSize',LC.size); set('#lcSpacing',LC.spacing); set('#lcUpper',LC.upper);
+  set('#lcColor',LC.color); set('#lcGrad',LC.grad); set('#lcColor2',LC.color2);
+  set('#lcOutline',LC.outlineOn); set('#lcOutlineW',LC.outlineW); set('#lcOutlineColor',LC.outlineColor);
+  set('#lcShadow',LC.shadowOn); set('#lcShadowBlur',LC.shadowBlur); set('#lcShadowDist',LC.shadowDist); set('#lcShadowColor',LC.shadowColor);
+  set('#lcPlate',LC.plateOn); set('#lcPlateOpacity',LC.plateOpacity); set('#lcPlateColor',LC.plateColor);
+}
+function randomizeLogo(){
+  const pick=a=>a[Math.floor(Math.random()*a.length)], ri=(a,b)=>Math.floor(a+Math.random()*(b-a+1));
+  LC.font=ri(0,LOGO_FONTS.length-1); LC.weight=pick(['400','700','900']);
+  LC.size=ri(80,170); LC.spacing=ri(0,12); LC.upper=Math.random()<0.7;
+  const hue=ri(0,360);
+  LC.color=hslToHex(hue,ri(70,100),ri(58,78)); LC.grad=Math.random()<0.5;
+  LC.color2=hslToHex((hue+ri(25,90))%360,ri(70,100),ri(45,65));
+  LC.outlineOn=Math.random()<0.7; LC.outlineW=ri(3,9); LC.outlineColor=pick(['#0e1419','#000000','#ffffff']);
+  LC.shadowOn=Math.random()<0.7; LC.shadowBlur=ri(6,22); LC.shadowDist=ri(2,10);
+  LC.plateOn=Math.random()<0.25; LC.plateOpacity=ri(25,55);
+  syncLogoControls(); updateLogoPreview();
+}
+function applyLogoCreator(){
+  if(!LC.line1.trim() && !LC.line2.trim()){ toast('Enter some text first'); return; }
+  const cv=renderTextLogo(3);
+  IMG.logo={img:cv, w:cv.width, h:cv.height};
+  document.querySelectorAll('.upload-btn.hint').forEach(b=>b.classList.remove('hint'));
+  CAPSULES.forEach(c=>{ ST[c.id].logo.init=false; });
+  $('#logoName').textContent='Text logo'; $('#logoBtn').classList.add('loaded');
+  $('#logoInput').value='';
+  closeLogoCreator(); refreshAll(); toast('Text logo applied to all capsules');
+}
+function buildFontOptions(){
+  const sel=$('#lcFont'); if(!sel||sel._built)return;
+  sel.innerHTML=LOGO_FONTS.map((f,i)=>`<option value="${i}">${f.label}</option>`).join(''); sel._built=true;
+}
+function openLogoCreator(){ buildFontOptions(); syncLogoControls(); $('#logoModal').classList.add('open'); updateLogoPreview(); }
+function closeLogoCreator(){ $('#logoModal').classList.remove('open'); }
+(function wireLogoCreator(){
+  const bind=(id,key,kind)=>{const e=$(id); if(!e)return;
+    const evt=(e.type==='text'||e.type==='range'||e.type==='color')?'input':'change';
+    e.addEventListener(evt,()=>{ let v=e.type==='checkbox'?e.checked:e.value; if(kind==='int')v=parseInt(v,10);
+      LC[key]=v; updateLogoPreview(); }); };
+  bind('#lcLine1','line1'); bind('#lcLine2','line2'); bind('#lcFont','font','int'); bind('#lcWeight','weight');
+  bind('#lcSize','size','int'); bind('#lcSpacing','spacing','int'); bind('#lcUpper','upper');
+  bind('#lcColor','color'); bind('#lcGrad','grad'); bind('#lcColor2','color2');
+  bind('#lcOutline','outlineOn'); bind('#lcOutlineW','outlineW','int'); bind('#lcOutlineColor','outlineColor');
+  bind('#lcShadow','shadowOn'); bind('#lcShadowBlur','shadowBlur','int'); bind('#lcShadowDist','shadowDist','int'); bind('#lcShadowColor','shadowColor');
+  bind('#lcPlate','plateOn'); bind('#lcPlateOpacity','plateOpacity','int'); bind('#lcPlateColor','plateColor');
+  $('#logoCreateBtn').addEventListener('click',openLogoCreator);
+  $('#lcRandom').addEventListener('click',randomizeLogo);
+  $('#lcApply').addEventListener('click',applyLogoCreator);
+  $('#lcCancel').addEventListener('click',closeLogoCreator);
+  $('#logoModal').addEventListener('click',e=>{ if(e.target.id==='logoModal')closeLogoCreator(); });
+})();
 
 /* ---------- Welcome / tutorial ---------- */
 function openWelcome(){ $('#welcome').classList.add('open'); }
