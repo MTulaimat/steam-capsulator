@@ -210,6 +210,16 @@
   .lc-preview{background:repeating-conic-gradient(#2a3340 0% 25%, #232b36 0% 50%) 50%/18px 18px;border:1px solid var(--line);border-radius:8px;min-height:200px;display:flex;align-items:center;justify-content:center;padding:12px;overflow:hidden}
   .lc-preview canvas{max-width:100%;max-height:260px;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5))}
   .lc-controls{display:flex;flex-direction:column}
+  .lc-tabs{display:flex;gap:4px;margin:2px 0 14px;border-bottom:1px solid var(--line)}
+  .lc-tab{background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:-1px}
+  .lc-tab:hover{color:#fff}
+  .lc-tab.active{color:#fff;border-bottom-color:var(--accent)}
+  .lc-preview{position:relative}
+  .lc-row textarea{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:7px 9px;font:13px/1.4 inherit;resize:vertical}
+  .lc-row textarea:focus{outline:none;border-color:var(--accent)}
+  .ai-status{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;color:var(--muted);font-size:12px;line-height:1.5;pointer-events:none}
+  .ai-status.err{color:var(--bad)}
+  .ai-status.busy{color:var(--accent)}
   .lc-row{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:12px;color:var(--text)}
   .lc-row .lab{flex:0 0 58px;color:var(--muted)}
   .lc-row .tog{flex:0 0 96px;display:flex;align-items:center;gap:6px;color:var(--text);cursor:pointer;user-select:none}
@@ -359,6 +369,11 @@
 <div class="modal" id="logoModal">
   <div class="dialog" style="width:min(780px,95vw)">
     <h2>Logo Creator</h2>
+    <div class="lc-tabs">
+      <button type="button" class="lc-tab active" id="lcTabBtnText">✎ Text</button>
+      <button type="button" class="lc-tab" id="lcTabBtnAI">✨ AI generate</button>
+    </div>
+    <div id="lcTabText">
     <p>Design a text logo — tweak the style or hit randomize, then Apply to use it across every capsule (instead of uploading one).</p>
     <div class="lc-grid">
       <div class="lc-preview" id="lcPreview"><canvas id="lcCanvas"></canvas></div>
@@ -387,6 +402,25 @@
       <button class="action ghost" id="lcRandom" style="margin-right:auto">🎲 Randomize</button>
       <button class="action ghost" id="lcCancel">Cancel</button>
       <button class="action" id="lcApply">Apply logo</button>
+    </div>
+    </div>
+    <div id="lcTabAI" style="display:none">
+    <p>Describe a logo and generate it free via <b>Pollinations.ai</b>. Your prompt is sent to their servers; results are AI art (raster), so transparency is best-effort.</p>
+    <div class="lc-grid">
+      <div class="lc-preview" id="aiPreview"><canvas id="aiCanvas"></canvas><div class="ai-status" id="aiStatus">Enter a prompt, then hit Generate</div></div>
+      <div class="lc-controls">
+        <div class="lc-row" style="align-items:flex-start"><span class="lab" style="margin-top:6px">Prompt</span><textarea id="aiPrompt" rows="4" placeholder="e.g. fierce dragon emblem, esports mascot logo"></textarea></div>
+        <div class="lc-row"><span class="lab"></span><button type="button" class="action ghost" id="aiDice" style="padding:6px 10px;font-size:12px">🎲 Random prompt</button></div>
+        <div class="lc-row"><span class="lab">Style</span><select id="aiStyle"></select></div>
+        <div class="lc-row"><label class="tog" style="flex:0 0 auto"><input type="checkbox" id="aiRemoveBg"> Remove background</label></div>
+        <div class="lc-row"><small style="color:var(--muted);font-size:11px;line-height:1.4">Generation can take 10–30s. Generate again for a new variation.</small></div>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button class="action ghost" id="aiCancel" style="margin-right:auto">Cancel</button>
+      <button class="action ghost" id="aiGen">✨ Generate</button>
+      <button class="action" id="aiApply" disabled>Apply logo</button>
+    </div>
     </div>
   </div>
 </div>
@@ -420,7 +454,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = '2.3';
+const APP_VERSION = '2.4';
 
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
@@ -1314,11 +1348,104 @@ function applyLogoCreator(){
   $('#logoInput').value='';
   closeLogoCreator(); refreshAll(); toast('Text logo applied to all capsules');
 }
+/* ---------- AI generate (Pollinations.ai) ---------- */
+const AI_PROMPTS=[
+  'fierce dragon emblem, esports mascot logo, red and gold',
+  'minimalist fox head game logo, geometric, neon blue and orange',
+  'retro 80s synthwave arcade logo, chrome, sunset colors',
+  'cute pixel-art slime mascot logo, green, bold outline',
+  'medieval sword and shield crest, fantasy game logo, silver',
+  'cyberpunk skull logo, glitch style, magenta and cyan',
+  'space rocket badge logo, flat vector, navy and yellow',
+  'wolf howling at the moon, esports logo, monochrome with blue accent',
+  'samurai helmet mascot logo, dark red, aggressive',
+  'phoenix rising emblem, fiery orange, ornate detail',
+  'robot head mascot, futuristic esports logo, teal glow',
+  'haunted skull pirate logo, weathered, bone white',
+];
+const AI_STYLES=[
+  {label:'Auto', s:''},
+  {label:'Esports mascot', s:', esports mascot logo, bold thick outline, vector, high detail'},
+  {label:'Retro arcade', s:', retro arcade game logo, 80s, vibrant, sticker style'},
+  {label:'Minimal flat', s:', minimal flat vector logo, simple bold shapes'},
+  {label:'Metallic 3D', s:', glossy metallic 3D emblem, dramatic lighting'},
+  {label:'Hand-drawn', s:', hand-drawn inked logo, sketch style'},
+];
+const LCAI={ style:0, removeBg:true, canvas:null };
+let aiReqId=0;
+function setAiStatus(text, kind){ const e=$('#aiStatus'); if(!e)return;
+  e.textContent=text||''; e.classList.toggle('err',kind==='err'); e.classList.toggle('busy',kind==='busy');
+  e.style.display=text?'flex':'none';
+}
+function removeFlatBackground(cv, tol){
+  const g=cv.getContext('2d'), w=cv.width, h=cv.height, id=g.getImageData(0,0,w,h), d=id.data;
+  const corners=[[0,0],[w-1,0],[0,h-1],[w-1,h-1]]; let r=0,gn=0,b=0;
+  corners.forEach(c=>{const i=(c[1]*w+c[0])*4; r+=d[i];gn+=d[i+1];b+=d[i+2];}); r/=4;gn/=4;b/=4;
+  const vis=new Uint8Array(w*h), st=[], t=tol*tol*3;
+  corners.forEach(c=>st.push(c[0],c[1]));
+  while(st.length){ const y=st.pop(), x=st.pop();
+    if(x<0||y<0||x>=w||y>=h) continue; const p=y*w+x; if(vis[p]) continue; vis[p]=1;
+    const i=p*4, dr=d[i]-r, dg=d[i+1]-gn, db=d[i+2]-b;
+    if(dr*dr+dg*dg+db*db>t) continue;
+    d[i+3]=0; st.push(x+1,y,x-1,y,x,y+1,x,y-1);
+  }
+  g.putImageData(id,0,0); return cv;
+}
+function drawAiPreview(cv){
+  const host=$('#aiPreview'), pc=$('#aiCanvas');
+  const maxW=Math.max(80,host.clientWidth-28), maxH=240, r=Math.min(maxW/cv.width,maxH/cv.height,1);
+  pc.width=Math.max(1,Math.round(cv.width*r)); pc.height=Math.max(1,Math.round(cv.height*r));
+  const g=pc.getContext('2d'); g.clearRect(0,0,pc.width,pc.height); g.drawImage(cv,0,0,pc.width,pc.height);
+}
+function generateAI(){
+  const base=($('#aiPrompt').value||'').trim(); if(!base){ toast('Enter a prompt first'); return; }
+  const style=(AI_STYLES[LCAI.style]||AI_STYLES[0]).s;
+  const bg=LCAI.removeBg ? ', centered, isolated on a plain solid white background' : '';
+  const full=base+style+', game logo, sharp clean edges'+bg;
+  const seed=Math.floor(Math.random()*1e6);
+  const url='https://image.pollinations.ai/prompt/'+encodeURIComponent(full)+'?width=768&height=768&nologo=true&seed='+seed+'&model=flux';
+  const id=++aiReqId; LCAI.canvas=null; $('#aiApply').disabled=true;
+  setAiStatus('Generating… (can take 10–30s)','busy');
+  const img=new Image(); img.crossOrigin='anonymous';
+  img.onload=()=>{ if(id!==aiReqId)return;
+    let cv=document.createElement('canvas'); cv.width=img.naturalWidth; cv.height=img.naturalHeight;
+    cv.getContext('2d').drawImage(img,0,0);
+    if(LCAI.removeBg){ try{ cv=trimCanvas(removeFlatBackground(cv,70)); }
+      catch(e){ setAiStatus('Generated, but background couldn’t be read (CORS). Applying as-is.','err'); } }
+    LCAI.canvas=cv; drawAiPreview(cv); setAiStatus('',null); $('#aiApply').disabled=false;
+  };
+  img.onerror=()=>{ if(id!==aiReqId)return;
+    setAiStatus('Generation failed — network may block pollinations.ai. Try again.','err'); };
+  img.src=url;
+}
+function applyAI(){
+  if(!LCAI.canvas){ toast('Generate a logo first'); return; }
+  const cv=LCAI.canvas; IMG.logo={img:cv, w:cv.width, h:cv.height};
+  document.querySelectorAll('.upload-btn.hint').forEach(b=>b.classList.remove('hint'));
+  CAPSULES.forEach(c=>{ ST[c.id].logo.init=false; });
+  $('#logoName').textContent='AI logo'; $('#logoBtn').classList.add('loaded'); $('#logoInput').value='';
+  closeLogoCreator(); refreshAll(); toast('AI logo applied to all capsules');
+}
+function rollAiPrompt(){ const p=AI_PROMPTS[Math.floor(Math.random()*AI_PROMPTS.length)];
+  $('#aiPrompt').value=p; }
+function setLogoTab(which){
+  const text=(which==='text');
+  $('#lcTabText').style.display=text?'':'none';
+  $('#lcTabAI').style.display=text?'none':'';
+  $('#lcTabBtnText').classList.toggle('active',text);
+  $('#lcTabBtnAI').classList.toggle('active',!text);
+  if(text) updateLogoPreview();
+}
 function buildFontOptions(){
   const sel=$('#lcFont'); if(sel&&!sel._built){ sel.innerHTML=LOGO_FONTS.map((f,i)=>`<option value="${i}">${f.label}</option>`).join(''); sel._built=true; }
   const psel=$('#lcPlateShape'); if(psel&&!psel._built){ psel.innerHTML=PLATE_SHAPES.map((s,i)=>`<option value="${i}">${s.label}</option>`).join(''); psel._built=true; }
+  const asel=$('#lcAiStyle')||$('#aiStyle'); if(asel&&!asel._built){ asel.innerHTML=AI_STYLES.map((s,i)=>`<option value="${i}">${s.label}</option>`).join(''); asel._built=true; }
 }
-function openLogoCreator(){ buildFontOptions(); syncLogoControls(); $('#logoModal').classList.add('open'); updateLogoPreview(); }
+function openLogoCreator(){ buildFontOptions(); syncLogoControls();
+  $('#aiStyle').value=LCAI.style; $('#aiRemoveBg').checked=LCAI.removeBg;
+  if(!$('#aiPrompt').value.trim()) rollAiPrompt();
+  setLogoTab('text'); $('#logoModal').classList.add('open'); updateLogoPreview();
+}
 function closeLogoCreator(){ $('#logoModal').classList.remove('open'); }
 (function wireLogoCreator(){
   const bind=(id,key,kind)=>{const e=$(id); if(!e)return;
@@ -1340,6 +1467,15 @@ function closeLogoCreator(){ $('#logoModal').classList.remove('open'); }
   $('#lcApply').addEventListener('click',applyLogoCreator);
   $('#lcCancel').addEventListener('click',closeLogoCreator);
   $('#logoModal').addEventListener('click',e=>{ if(e.target.id==='logoModal')closeLogoCreator(); });
+  // tabs + AI generator
+  $('#lcTabBtnText').addEventListener('click',()=>setLogoTab('text'));
+  $('#lcTabBtnAI').addEventListener('click',()=>setLogoTab('ai'));
+  $('#aiStyle').addEventListener('change',e=>{ LCAI.style=parseInt(e.target.value,10); });
+  $('#aiRemoveBg').addEventListener('change',e=>{ LCAI.removeBg=e.target.checked; });
+  $('#aiDice').addEventListener('click',rollAiPrompt);
+  $('#aiGen').addEventListener('click',generateAI);
+  $('#aiApply').addEventListener('click',applyAI);
+  $('#aiCancel').addEventListener('click',closeLogoCreator);
 })();
 
 /* ---------- Welcome / tutorial ---------- */
