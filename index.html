@@ -375,7 +375,11 @@
         <div class="lc-row"><label class="tog"><input type="checkbox" id="lcOutline"> Outline</label><input type="range" id="lcOutlineW" min="1" max="20" step="1"><input type="color" id="lcOutlineColor"></div>
         <div class="lc-row"><label class="tog"><input type="checkbox" id="lcShadow"> Shadow</label><input type="range" id="lcShadowBlur" min="0" max="40" step="1"><input type="range" id="lcShadowDist" min="0" max="24" step="1"><input type="color" id="lcShadowColor"></div>
         <div class="lc-row"><label class="tog"><input type="checkbox" id="lc3d"> 3D depth</label><input type="range" id="lc3dDepth" min="1" max="40" step="1"><input type="color" id="lc3dColor"></div>
-        <div class="lc-row"><label class="tog"><input type="checkbox" id="lcPlate"> Plate</label><input type="range" id="lcPlateOpacity" min="0" max="100" step="5"><input type="color" id="lcPlateColor"></div>
+        <div class="lc-row"><label class="tog"><input type="checkbox" id="lcPlate"> Plate</label><select id="lcPlateShape" style="flex:1"></select></div>
+        <div class="lc-row"><span class="lab">Fill</span><input type="color" id="lcPlateColor"><span class="lab" style="flex:0 0 auto">Opacity</span><input type="range" id="lcPlateOpacity" min="0" max="100" step="5"></div>
+        <div class="lc-row"><span class="lab">Size</span><input type="range" id="lcPlatePad" min="0" max="120" step="2"><span class="lab" style="flex:0 0 auto">Shape</span><input type="range" id="lcPlateMod" min="0" max="100" step="2"></div>
+        <div class="lc-row"><span class="lab">Rotate</span><input type="range" id="lcPlateRotate" min="-45" max="45" step="1"></div>
+        <div class="lc-row"><label class="tog"><input type="checkbox" id="lcPlateStroke"> Border</label><input type="range" id="lcPlateStrokeW" min="1" max="24" step="1"><input type="color" id="lcPlateStrokeColor"></div>
       </div>
     </div>
     <div class="dialog-actions">
@@ -415,7 +419,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = '2.1';
+const APP_VERSION = '2.2';
 
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
@@ -1166,6 +1170,8 @@ const LC = {
   shadowOn:true, shadowBlur:14, shadowDist:6, shadowColor:'#000000',
   d3On:false, d3Depth:12, d3Color:'#11384f',
   plateOn:false, plateColor:'#000000', plateOpacity:40,
+  plateShape:0, platePad:30, plateMod:40, plateRotate:0,
+  plateStrokeOn:false, plateStrokeW:6, plateStrokeColor:'#ffffff',
 };
 function hslToHex(h,s,l){ s/=100; l/=100;
   const a=s*Math.min(l,1-l), f=n=>{const k=(n+h/30)%12, c=l-a*Math.max(-1,Math.min(k-3,9-k,1));
@@ -1176,6 +1182,23 @@ function roundRectPath(g,x,y,w,h,r){ r=Math.min(r,w/2,h/2);
   g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
   g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath();
 }
+function polyPath(g,pts){ g.beginPath(); pts.forEach((p,i)=> i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1])); g.closePath(); }
+// Plate shapes — each builds a centred path (cx,cy). `mod` 0..100 reshapes; `expand` gives room to inscribe the text box.
+const PLATE_SHAPES=[
+  {label:'Rounded rect', expand:1.0, path:(g,cx,cy,w,h,mod)=>{ roundRectPath(g,cx-w/2,cy-h/2,w,h,Math.min(w,h)*(mod/100)*0.5); }},
+  {label:'Rectangle',    expand:1.0, path:(g,cx,cy,w,h)=>{ g.beginPath(); g.rect(cx-w/2,cy-h/2,w,h); }},
+  {label:'Pill',         expand:1.05,path:(g,cx,cy,w,h)=>{ roundRectPath(g,cx-w/2,cy-h/2,w,h,Math.min(w,h)/2); }},
+  {label:'Ellipse',      expand:1.42,path:(g,cx,cy,w,h)=>{ g.beginPath(); g.ellipse(cx,cy,w/2,h/2,0,0,Math.PI*2); }},
+  {label:'Hexagon',      expand:1.26,path:(g,cx,cy,w,h,mod)=>{ const c=w*(0.1+(mod/100)*0.28); polyPath(g,[[cx-w/2,cy],[cx-w/2+c,cy-h/2],[cx+w/2-c,cy-h/2],[cx+w/2,cy],[cx+w/2-c,cy+h/2],[cx-w/2+c,cy+h/2]]); }},
+  {label:'Octagon',      expand:1.18,path:(g,cx,cy,w,h,mod)=>{ const a=w*(0.08+(mod/100)*0.26), b=h*(0.08+(mod/100)*0.26); polyPath(g,[[cx-w/2+a,cy-h/2],[cx+w/2-a,cy-h/2],[cx+w/2,cy-h/2+b],[cx+w/2,cy+h/2-b],[cx+w/2-a,cy+h/2],[cx-w/2+a,cy+h/2],[cx-w/2,cy+h/2-b],[cx-w/2,cy-h/2+b]]); }},
+  {label:'Diamond',      expand:2.0, path:(g,cx,cy,w,h)=>{ polyPath(g,[[cx,cy-h/2],[cx+w/2,cy],[cx,cy+h/2],[cx-w/2,cy]]); }},
+  {label:'Banner',       expand:1.08,path:(g,cx,cy,w,h,mod)=>{ const t=w*(0.05+(mod/100)*0.14); polyPath(g,[[cx-w/2,cy-h/2],[cx+w/2,cy-h/2],[cx+w/2-t,cy],[cx+w/2,cy+h/2],[cx-w/2,cy+h/2],[cx-w/2+t,cy]]); }},
+  {label:'Parallelogram',expand:1.12,path:(g,cx,cy,w,h,mod)=>{ const s=w*(mod/100)*0.4; polyPath(g,[[cx-w/2+s,cy-h/2],[cx+w/2,cy-h/2],[cx+w/2-s,cy+h/2],[cx-w/2,cy+h/2]]); }},
+  {label:'Shield',       expand:1.32,path:(g,cx,cy,w,h)=>{ const x0=cx-w/2,x1=cx+w/2,y0=cy-h/2; g.beginPath(); g.moveTo(x0,y0); g.lineTo(x1,y0); g.lineTo(x1,cy+h*0.10); g.quadraticCurveTo(x1,cy+h/2,cx,cy+h/2); g.quadraticCurveTo(x0,cy+h/2,x0,cy+h*0.10); g.closePath(); }},
+  {label:'Tag',          expand:1.06,path:(g,cx,cy,w,h,mod)=>{ const c=Math.min(w,h)*(0.12+(mod/100)*0.28); polyPath(g,[[cx-w/2+c,cy-h/2],[cx+w/2,cy-h/2],[cx+w/2,cy+h/2],[cx-w/2+c,cy+h/2],[cx-w/2,cy]]); }},
+  {label:'Burst',        expand:1.5, path:(g,cx,cy,w,h,mod)=>{ const pts=Math.round(8+(mod/100)*14), ro=1, ri=0.76; g.beginPath();
+    for(let i=0;i<pts*2;i++){ const ang=Math.PI*i/pts-Math.PI/2, rad=(i%2?ri:ro), px=cx+Math.cos(ang)*w/2*rad, py=cy+Math.sin(ang)*h/2*rad; i?g.lineTo(px,py):g.moveTo(px,py); } g.closePath(); }},
+];
 function trimCanvas(cv){
   const g=cv.getContext('2d'), w=cv.width, h=cv.height, d=g.getImageData(0,0,w,h).data;
   let top=h,left=w,right=0,bottom=0,found=false;
@@ -1204,14 +1227,27 @@ function renderTextLogo(scale){
     L.w=m.measureText(L.t).width+Math.max(0,sp); L.h=L.size*1.28; if(L.w>maxW)maxW=L.w; });
   const gap=lines.length>1 ? o.size*scale*(o.lineGap/100) : 0;
   const textH=lines.reduce((a,L)=>a+L.h,0)+gap*(lines.length-1);
-  const extra=(o.outlineOn?o.outlineW*scale:0)+(o.shadowOn?(o.shadowBlur+o.shadowDist)*scale:0)+(o.d3On?o.d3Depth*scale:0);
-  const pad=o.size*scale*0.32+extra+18*scale;
-  const W=Math.max(2,Math.ceil(maxW+pad*2)), H=Math.max(2,Math.ceil(textH+pad*2));
+  const textExtra=(o.outlineOn?o.outlineW*scale:0)+(o.shadowOn?(o.shadowBlur+o.shadowDist)*scale:0)+(o.d3On?o.d3Depth*scale:0);
+  // plate geometry (sized to inscribe the text box, then expanded per shape)
+  let plateW=0, plateH=0; const shape=PLATE_SHAPES[o.plateShape]||PLATE_SHAPES[0];
+  if(o.plateOn){ const pp=(o.platePad/100)*o.size*scale + textExtra;
+    plateW=maxW*shape.expand + pp*2; plateH=textH*shape.expand + pp*2; }
+  const strokeM=(o.plateOn&&o.plateStrokeOn)? o.plateStrokeW*scale : 0;
+  let needW=Math.max(maxW+textExtra*2, plateW+strokeM*2);
+  let needH=Math.max(textH+textExtra*2, plateH+strokeM*2);
+  if(o.plateOn && o.plateRotate){ const a=Math.abs(o.plateRotate*Math.PI/180);
+    needW=Math.max(needW, Math.abs(plateW*Math.cos(a))+Math.abs(plateH*Math.sin(a))+strokeM*2);
+    needH=Math.max(needH, Math.abs(plateW*Math.sin(a))+Math.abs(plateH*Math.cos(a))+strokeM*2); }
+  const baseM=o.size*scale*0.2+16*scale;
+  const W=Math.max(2,Math.ceil(needW+baseM*2)), H=Math.max(2,Math.ceil(needH+baseM*2));
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
   const g=cv.getContext('2d'); g.textAlign='center'; g.textBaseline='middle';
-  if(o.plateOn){ g.fillStyle=hexA(o.plateColor,o.plateOpacity/100);
-    const m2=pad*0.45; roundRectPath(g,m2,m2,W-m2*2,H-m2*2,Math.min(W,H)*0.06); g.fill(); }
-  let y=pad+lines[0].h/2;
+  if(o.plateOn){ g.save(); g.translate(W/2,H/2); g.rotate((o.plateRotate||0)*Math.PI/180);
+    shape.path(g,0,0,plateW,plateH,o.plateMod);
+    g.fillStyle=hexA(o.plateColor,o.plateOpacity/100); g.fill();
+    if(o.plateStrokeOn && o.plateStrokeW>0){ g.lineWidth=o.plateStrokeW*scale; g.strokeStyle=o.plateStrokeColor; g.lineJoin='round'; g.stroke(); }
+    g.restore(); }
+  let y=(H-textH)/2+lines[0].h/2;
   lines.forEach((L,i)=>{
     g.font=`${o.weight} ${L.size}px ${fam}`; g.letterSpacing=sp+'px'; const cx=W/2;
     if(o.shadowOn){ g.save(); g.shadowColor=hexA(o.shadowColor,.9); g.shadowBlur=o.shadowBlur*scale;
@@ -1246,6 +1282,8 @@ function syncLogoControls(){
   set('#lcShadow',LC.shadowOn); set('#lcShadowBlur',LC.shadowBlur); set('#lcShadowDist',LC.shadowDist); set('#lcShadowColor',LC.shadowColor);
   set('#lc3d',LC.d3On); set('#lc3dDepth',LC.d3Depth); set('#lc3dColor',LC.d3Color);
   set('#lcPlate',LC.plateOn); set('#lcPlateOpacity',LC.plateOpacity); set('#lcPlateColor',LC.plateColor);
+  set('#lcPlateShape',LC.plateShape); set('#lcPlatePad',LC.platePad); set('#lcPlateMod',LC.plateMod); set('#lcPlateRotate',LC.plateRotate);
+  set('#lcPlateStroke',LC.plateStrokeOn); set('#lcPlateStrokeW',LC.plateStrokeW); set('#lcPlateStrokeColor',LC.plateStrokeColor);
 }
 function randomizeLogo(){
   const pick=a=>a[Math.floor(Math.random()*a.length)], ri=(a,b)=>Math.floor(a+Math.random()*(b-a+1));
@@ -1258,7 +1296,10 @@ function randomizeLogo(){
   LC.outlineOn=Math.random()<0.7; LC.outlineW=ri(3,9); LC.outlineColor=pick(['#0e1419','#000000','#ffffff']);
   LC.shadowOn=Math.random()<0.6; LC.shadowBlur=ri(6,22); LC.shadowDist=ri(2,10);
   LC.d3On=Math.random()<0.4; LC.d3Depth=ri(6,22); LC.d3Color=hslToHex(hue,ri(55,90),ri(20,35));
-  LC.plateOn=Math.random()<0.25; LC.plateOpacity=ri(25,55);
+  LC.plateOn=Math.random()<0.4; LC.plateShape=ri(0,PLATE_SHAPES.length-1); LC.platePad=ri(15,60);
+  LC.plateMod=ri(0,100); LC.plateRotate=Math.random()<0.3?ri(-20,20):0;
+  LC.plateColor=hslToHex((hue+ri(150,210))%360,ri(40,80),ri(14,32)); LC.plateOpacity=ri(60,92);
+  LC.plateStrokeOn=Math.random()<0.4; LC.plateStrokeW=ri(3,10); LC.plateStrokeColor=LC.color;
   syncLogoControls(); updateLogoPreview();
 }
 function applyLogoCreator(){
@@ -1272,8 +1313,8 @@ function applyLogoCreator(){
   closeLogoCreator(); refreshAll(); toast('Text logo applied to all capsules');
 }
 function buildFontOptions(){
-  const sel=$('#lcFont'); if(!sel||sel._built)return;
-  sel.innerHTML=LOGO_FONTS.map((f,i)=>`<option value="${i}">${f.label}</option>`).join(''); sel._built=true;
+  const sel=$('#lcFont'); if(sel&&!sel._built){ sel.innerHTML=LOGO_FONTS.map((f,i)=>`<option value="${i}">${f.label}</option>`).join(''); sel._built=true; }
+  const psel=$('#lcPlateShape'); if(psel&&!psel._built){ psel.innerHTML=PLATE_SHAPES.map((s,i)=>`<option value="${i}">${s.label}</option>`).join(''); psel._built=true; }
 }
 function openLogoCreator(){ buildFontOptions(); syncLogoControls(); $('#logoModal').classList.add('open'); updateLogoPreview(); }
 function closeLogoCreator(){ $('#logoModal').classList.remove('open'); }
@@ -1290,6 +1331,8 @@ function closeLogoCreator(){ $('#logoModal').classList.remove('open'); }
   bind('#lcShadow','shadowOn'); bind('#lcShadowBlur','shadowBlur','int'); bind('#lcShadowDist','shadowDist','int'); bind('#lcShadowColor','shadowColor');
   bind('#lc3d','d3On'); bind('#lc3dDepth','d3Depth','int'); bind('#lc3dColor','d3Color');
   bind('#lcPlate','plateOn'); bind('#lcPlateOpacity','plateOpacity','int'); bind('#lcPlateColor','plateColor');
+  bind('#lcPlateShape','plateShape','int'); bind('#lcPlatePad','platePad','int'); bind('#lcPlateMod','plateMod','int'); bind('#lcPlateRotate','plateRotate','int');
+  bind('#lcPlateStroke','plateStrokeOn'); bind('#lcPlateStrokeW','plateStrokeW','int'); bind('#lcPlateStrokeColor','plateStrokeColor');
   $('#logoCreateBtn').addEventListener('click',openLogoCreator);
   $('#lcRandom').addEventListener('click',randomizeLogo);
   $('#lcApply').addEventListener('click',applyLogoCreator);
