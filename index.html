@@ -373,6 +373,7 @@
         <hr class="lc-sep">
         <div class="lc-row"><label class="tog"><input type="checkbox" id="lcOutline"> Outline</label><input type="range" id="lcOutlineW" min="1" max="20" step="1"><input type="color" id="lcOutlineColor"></div>
         <div class="lc-row"><label class="tog"><input type="checkbox" id="lcShadow"> Shadow</label><input type="range" id="lcShadowBlur" min="0" max="40" step="1"><input type="range" id="lcShadowDist" min="0" max="24" step="1"><input type="color" id="lcShadowColor"></div>
+        <div class="lc-row"><label class="tog"><input type="checkbox" id="lc3d"> 3D depth</label><input type="range" id="lc3dDepth" min="1" max="40" step="1"><input type="color" id="lc3dColor"></div>
         <div class="lc-row"><label class="tog"><input type="checkbox" id="lcPlate"> Plate</label><input type="range" id="lcPlateOpacity" min="0" max="100" step="5"><input type="color" id="lcPlateColor"></div>
       </div>
     </div>
@@ -413,7 +414,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = '1.9';
+const APP_VERSION = '2.0';
 
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
@@ -1161,6 +1162,7 @@ const LC = {
   color:'#ffffff', grad:false, color2:'#66c0f4',
   outlineOn:true, outlineW:6, outlineColor:'#0e1419',
   shadowOn:true, shadowBlur:14, shadowDist:6, shadowColor:'#000000',
+  d3On:false, d3Depth:12, d3Color:'#11384f',
   plateOn:false, plateColor:'#000000', plateOpacity:40,
 };
 function hslToHex(h,s,l){ s/=100; l/=100;
@@ -1197,7 +1199,7 @@ function renderTextLogo(scale){
     L.w=m.measureText(L.t).width+Math.max(0,sp); L.h=L.size*1.28; if(L.w>maxW)maxW=L.w; });
   const gap=lines.length>1 ? o.size*scale*0.16 : 0;
   const textH=lines.reduce((a,L)=>a+L.h,0)+gap*(lines.length-1);
-  const extra=(o.outlineOn?o.outlineW*scale:0)+(o.shadowOn?(o.shadowBlur+o.shadowDist)*scale:0);
+  const extra=(o.outlineOn?o.outlineW*scale:0)+(o.shadowOn?(o.shadowBlur+o.shadowDist)*scale:0)+(o.d3On?o.d3Depth*scale:0);
   const pad=o.size*scale*0.32+extra+18*scale;
   const W=Math.max(2,Math.ceil(maxW+pad*2)), H=Math.max(2,Math.ceil(textH+pad*2));
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
@@ -1209,6 +1211,8 @@ function renderTextLogo(scale){
     g.font=`${o.weight} ${L.size}px ${fam}`; g.letterSpacing=sp+'px'; const cx=W/2;
     if(o.shadowOn){ g.save(); g.shadowColor=hexA(o.shadowColor,.9); g.shadowBlur=o.shadowBlur*scale;
       g.shadowOffsetX=0; g.shadowOffsetY=o.shadowDist*scale; g.fillStyle='#000'; g.fillText(L.t,cx,y); g.restore(); }
+    if(o.d3On && o.d3Depth>0){ g.fillStyle=o.d3Color; const dep=o.d3Depth*scale, dx=0.7071, dy=0.7071;
+      for(let k=dep;k>=1;k--){ g.fillText(L.t, cx+dx*k, y+dy*k); } }
     if(o.outlineOn && o.outlineW>0){ g.lineWidth=o.outlineW*scale*2; g.strokeStyle=o.outlineColor;
       g.lineJoin='round'; g.miterLimit=2; g.strokeText(L.t,cx,y); }
     if(o.grad){ const gr=g.createLinearGradient(0,y-L.size/2,0,y+L.size/2);
@@ -1234,6 +1238,7 @@ function syncLogoControls(){
   set('#lcColor',LC.color); set('#lcGrad',LC.grad); set('#lcColor2',LC.color2);
   set('#lcOutline',LC.outlineOn); set('#lcOutlineW',LC.outlineW); set('#lcOutlineColor',LC.outlineColor);
   set('#lcShadow',LC.shadowOn); set('#lcShadowBlur',LC.shadowBlur); set('#lcShadowDist',LC.shadowDist); set('#lcShadowColor',LC.shadowColor);
+  set('#lc3d',LC.d3On); set('#lc3dDepth',LC.d3Depth); set('#lc3dColor',LC.d3Color);
   set('#lcPlate',LC.plateOn); set('#lcPlateOpacity',LC.plateOpacity); set('#lcPlateColor',LC.plateColor);
 }
 function randomizeLogo(){
@@ -1244,7 +1249,8 @@ function randomizeLogo(){
   LC.color=hslToHex(hue,ri(70,100),ri(58,78)); LC.grad=Math.random()<0.5;
   LC.color2=hslToHex((hue+ri(25,90))%360,ri(70,100),ri(45,65));
   LC.outlineOn=Math.random()<0.7; LC.outlineW=ri(3,9); LC.outlineColor=pick(['#0e1419','#000000','#ffffff']);
-  LC.shadowOn=Math.random()<0.7; LC.shadowBlur=ri(6,22); LC.shadowDist=ri(2,10);
+  LC.shadowOn=Math.random()<0.6; LC.shadowBlur=ri(6,22); LC.shadowDist=ri(2,10);
+  LC.d3On=Math.random()<0.4; LC.d3Depth=ri(6,22); LC.d3Color=hslToHex(hue,ri(55,90),ri(20,35));
   LC.plateOn=Math.random()<0.25; LC.plateOpacity=ri(25,55);
   syncLogoControls(); updateLogoPreview();
 }
@@ -1274,6 +1280,7 @@ function closeLogoCreator(){ $('#logoModal').classList.remove('open'); }
   bind('#lcColor','color'); bind('#lcGrad','grad'); bind('#lcColor2','color2');
   bind('#lcOutline','outlineOn'); bind('#lcOutlineW','outlineW','int'); bind('#lcOutlineColor','outlineColor');
   bind('#lcShadow','shadowOn'); bind('#lcShadowBlur','shadowBlur','int'); bind('#lcShadowDist','shadowDist','int'); bind('#lcShadowColor','shadowColor');
+  bind('#lc3d','d3On'); bind('#lc3dDepth','d3Depth','int'); bind('#lc3dColor','d3Color');
   bind('#lcPlate','plateOn'); bind('#lcPlateOpacity','plateOpacity','int'); bind('#lcPlateColor','plateColor');
   $('#logoCreateBtn').addEventListener('click',openLogoCreator);
   $('#lcRandom').addEventListener('click',randomizeLogo);
