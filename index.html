@@ -454,7 +454,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = '2.4';
+const APP_VERSION = '2.5';
 
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
@@ -1377,6 +1377,7 @@ function setAiStatus(text, kind){ const e=$('#aiStatus'); if(!e)return;
   e.textContent=text||''; e.classList.toggle('err',kind==='err'); e.classList.toggle('busy',kind==='busy');
   e.style.display=text?'flex':'none';
 }
+function aiBusy(on){ const b=$('#aiGen'); if(!b)return; b.disabled=on; b.textContent=on?'⏳ Generating…':'✨ Generate'; }
 function removeFlatBackground(cv, tol){
   const g=cv.getContext('2d'), w=cv.width, h=cv.height, id=g.getImageData(0,0,w,h), d=id.data;
   const corners=[[0,0],[w-1,0],[0,h-1],[w-1,h-1]]; let r=0,gn=0,b=0;
@@ -1405,16 +1406,16 @@ function generateAI(){
   const seed=Math.floor(Math.random()*1e6);
   const url='https://image.pollinations.ai/prompt/'+encodeURIComponent(full)+'?width=768&height=768&nologo=true&seed='+seed+'&model=flux';
   const id=++aiReqId; LCAI.canvas=null; $('#aiApply').disabled=true;
-  setAiStatus('Generating… (can take 10–30s)','busy');
+  setAiStatus('',null); aiBusy(true);
   const img=new Image(); img.crossOrigin='anonymous';
-  img.onload=()=>{ if(id!==aiReqId)return;
+  img.onload=()=>{ if(id!==aiReqId)return; aiBusy(false);
     let cv=document.createElement('canvas'); cv.width=img.naturalWidth; cv.height=img.naturalHeight;
     cv.getContext('2d').drawImage(img,0,0);
     if(LCAI.removeBg){ try{ cv=trimCanvas(removeFlatBackground(cv,70)); }
       catch(e){ setAiStatus('Generated, but background couldn’t be read (CORS). Applying as-is.','err'); } }
-    LCAI.canvas=cv; drawAiPreview(cv); setAiStatus('',null); $('#aiApply').disabled=false;
+    LCAI.canvas=cv; drawAiPreview(cv); $('#aiApply').disabled=false;
   };
-  img.onerror=()=>{ if(id!==aiReqId)return;
+  img.onerror=()=>{ if(id!==aiReqId)return; aiBusy(false);
     setAiStatus('Generation failed — network may block pollinations.ai. Try again.','err'); };
   img.src=url;
 }
