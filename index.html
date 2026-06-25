@@ -371,6 +371,7 @@
         <div class="lc-row"><span class="lab">Spacing</span><input type="range" id="lcSpacing" min="-5" max="30" step="1"></div>
         <div class="lc-row"><label class="tog" style="flex:0 0 auto"><input type="checkbox" id="lcSplit"> Words → lines</label><span class="lab" style="flex:0 0 auto">Line gap</span><input type="range" id="lcLineGap" min="-30" max="80" step="2"></div>
         <div class="lc-row"><span class="lab">Color</span><input type="color" id="lcColor"><label class="tog" style="flex:1"><input type="checkbox" id="lcGrad"> Gradient</label><input type="color" id="lcColor2"></div>
+        <div class="lc-row"><span class="lab"></span><label class="tog" style="flex:0 0 auto"><input type="checkbox" id="lcGradLine"> Per line (L1 / L2)</label></div>
         <hr class="lc-sep">
         <div class="lc-row"><label class="tog"><input type="checkbox" id="lcOutline"> Outline</label><input type="range" id="lcOutlineW" min="1" max="20" step="1"><input type="color" id="lcOutlineColor"></div>
         <div class="lc-row"><label class="tog"><input type="checkbox" id="lcShadow"> Shadow</label><input type="range" id="lcShadowBlur" min="0" max="40" step="1"><input type="range" id="lcShadowDist" min="0" max="24" step="1"><input type="color" id="lcShadowColor"></div>
@@ -419,7 +420,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = '2.2';
+const APP_VERSION = '2.3';
 
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
@@ -1165,7 +1166,7 @@ const LOGO_FONTS = [
 const LC = {
   line1:'GAME TITLE', line2:'', font:0, weight:'900', size:120, spacing:2, upper:true,
   splitWords:false, lineGap:16,
-  color:'#ffffff', grad:false, color2:'#66c0f4',
+  color:'#ffffff', grad:false, color2:'#66c0f4', gradLine:false,
   outlineOn:true, outlineW:6, outlineColor:'#0e1419',
   shadowOn:true, shadowBlur:14, shadowDist:6, shadowColor:'#000000',
   d3On:false, d3Depth:12, d3Color:'#11384f',
@@ -1219,7 +1220,7 @@ function renderTextLogo(scale){
     if(o.splitWords) o.line1.trim().split(/\s+/).forEach(w=>lines.push({t:cap(w), size:o.size*scale}));
     else lines.push({t:cap(o.line1), size:o.size*scale});
   }
-  if(o.line2.trim()) lines.push({t:cap(o.line2), size:o.size*0.5*scale});
+  if(o.line2.trim()) lines.push({t:cap(o.line2), size:o.size*0.5*scale, sub:true});
   if(!lines.length) lines.push({t:cap(o.line1)||' ', size:o.size*scale});
   const m=document.createElement('canvas').getContext('2d');
   let maxW=1;
@@ -1256,7 +1257,8 @@ function renderTextLogo(scale){
       for(let k=dep;k>=1;k--){ g.fillText(L.t, cx+dx*k, y+dy*k); } }
     if(o.outlineOn && o.outlineW>0){ g.lineWidth=o.outlineW*scale*2; g.strokeStyle=o.outlineColor;
       g.lineJoin='round'; g.miterLimit=2; g.strokeText(L.t,cx,y); }
-    if(o.grad){ const gr=g.createLinearGradient(0,y-L.size/2,0,y+L.size/2);
+    if(o.grad && o.gradLine){ g.fillStyle = L.sub ? o.color2 : o.color; }
+    else if(o.grad){ const gr=g.createLinearGradient(0,y-L.size/2,0,y+L.size/2);
       gr.addColorStop(0,o.color); gr.addColorStop(1,o.color2); g.fillStyle=gr; }
     else g.fillStyle=o.color;
     g.fillText(L.t,cx,y);
@@ -1277,7 +1279,7 @@ function syncLogoControls(){
   set('#lcLine1',LC.line1); set('#lcLine2',LC.line2); set('#lcFont',LC.font); set('#lcWeight',LC.weight);
   set('#lcSize',LC.size); set('#lcSpacing',LC.spacing); set('#lcUpper',LC.upper);
   set('#lcSplit',LC.splitWords); set('#lcLineGap',LC.lineGap);
-  set('#lcColor',LC.color); set('#lcGrad',LC.grad); set('#lcColor2',LC.color2);
+  set('#lcColor',LC.color); set('#lcGrad',LC.grad); set('#lcColor2',LC.color2); set('#lcGradLine',LC.gradLine);
   set('#lcOutline',LC.outlineOn); set('#lcOutlineW',LC.outlineW); set('#lcOutlineColor',LC.outlineColor);
   set('#lcShadow',LC.shadowOn); set('#lcShadowBlur',LC.shadowBlur); set('#lcShadowDist',LC.shadowDist); set('#lcShadowColor',LC.shadowColor);
   set('#lc3d',LC.d3On); set('#lc3dDepth',LC.d3Depth); set('#lc3dColor',LC.d3Color);
@@ -1292,7 +1294,7 @@ function randomizeLogo(){
   LC.splitWords=Math.random()<0.35; LC.lineGap=ri(0,40);
   const hue=ri(0,360);
   LC.color=hslToHex(hue,ri(70,100),ri(58,78)); LC.grad=Math.random()<0.5;
-  LC.color2=hslToHex((hue+ri(25,90))%360,ri(70,100),ri(45,65));
+  LC.color2=hslToHex((hue+ri(25,90))%360,ri(70,100),ri(45,65)); LC.gradLine=Math.random()<0.4;
   LC.outlineOn=Math.random()<0.7; LC.outlineW=ri(3,9); LC.outlineColor=pick(['#0e1419','#000000','#ffffff']);
   LC.shadowOn=Math.random()<0.6; LC.shadowBlur=ri(6,22); LC.shadowDist=ri(2,10);
   LC.d3On=Math.random()<0.4; LC.d3Depth=ri(6,22); LC.d3Color=hslToHex(hue,ri(55,90),ri(20,35));
@@ -1326,7 +1328,7 @@ function closeLogoCreator(){ $('#logoModal').classList.remove('open'); }
   bind('#lcLine1','line1'); bind('#lcLine2','line2'); bind('#lcFont','font','int'); bind('#lcWeight','weight');
   bind('#lcSize','size','int'); bind('#lcSpacing','spacing','int'); bind('#lcUpper','upper');
   bind('#lcSplit','splitWords'); bind('#lcLineGap','lineGap','int');
-  bind('#lcColor','color'); bind('#lcGrad','grad'); bind('#lcColor2','color2');
+  bind('#lcColor','color'); bind('#lcGrad','grad'); bind('#lcColor2','color2'); bind('#lcGradLine','gradLine');
   bind('#lcOutline','outlineOn'); bind('#lcOutlineW','outlineW','int'); bind('#lcOutlineColor','outlineColor');
   bind('#lcShadow','shadowOn'); bind('#lcShadowBlur','shadowBlur','int'); bind('#lcShadowDist','shadowDist','int'); bind('#lcShadowColor','shadowColor');
   bind('#lc3d','d3On'); bind('#lc3dDepth','d3Depth','int'); bind('#lc3dColor','d3Color');
