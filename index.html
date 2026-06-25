@@ -412,8 +412,11 @@
         <div class="lc-row" style="align-items:flex-start"><span class="lab" style="margin-top:6px">Prompt</span><textarea id="aiPrompt" rows="4" placeholder="e.g. fierce dragon emblem, esports mascot logo"></textarea></div>
         <div class="lc-row"><span class="lab"></span><button type="button" class="action ghost" id="aiDice" style="padding:6px 10px;font-size:12px">🎲 Random prompt</button></div>
         <div class="lc-row"><span class="lab">Style</span><select id="aiStyle"></select></div>
-        <div class="lc-row"><label class="tog" style="flex:0 0 auto"><input type="checkbox" id="aiRemoveBg"> Remove background</label></div>
-        <div class="lc-row"><small style="color:var(--muted);font-size:11px;line-height:1.4">Generation can take 10–30s. Generate again for a new variation.</small></div>
+        <hr class="lc-sep">
+        <div class="lc-row"><button type="button" class="action ghost" id="aiRemoveBtn" style="flex:1;padding:7px 10px;font-size:12px" disabled>Remove background</button><button type="button" class="action ghost" id="aiOrigBtn" style="padding:7px 10px;font-size:12px" disabled>Original</button></div>
+        <div class="lc-row"><span class="lab">Tolerance</span><input type="range" id="aiTol" min="10" max="170" step="2"></div>
+        <div class="lc-row"><span class="lab">Smoothing</span><input type="range" id="aiSmooth" min="0" max="8" step="1"></div>
+        <div class="lc-row"><small style="color:var(--muted);font-size:11px;line-height:1.4">Generate, then remove the background and tune tolerance / smoothing without regenerating. Generate again for a new variation.</small></div>
       </div>
     </div>
     <div class="dialog-actions">
@@ -454,7 +457,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = '2.6';
+const APP_VERSION = '2.7';
 
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
@@ -1371,8 +1374,9 @@ const AI_STYLES=[
   {label:'Metallic 3D', s:', glossy metallic 3D emblem, dramatic lighting'},
   {label:'Hand-drawn', s:', hand-drawn inked logo, sketch style'},
 ];
-const LCAI={ style:0, removeBg:true, canvas:null };
+const LCAI={ style:0, canvas:null, raw:null, tol:70, smooth:1, removed:false };
 let aiReqId=0;
+function copyCanvas(src){ const c=document.createElement('canvas'); c.width=src.width; c.height=src.height; c.getContext('2d').drawImage(src,0,0); return c; }
 function setAiStatus(text, kind){ const e=$('#aiStatus'); if(!e)return;
   e.textContent=text||''; e.classList.toggle('err',kind==='err'); e.classList.toggle('busy',kind==='busy');
   e.style.display=text?'flex':'none';
@@ -1392,6 +1396,31 @@ function removeFlatBackground(cv, tol){
   }
   g.putImageData(id,0,0); return cv;
 }
+// produce a cutout of `raw` (chroma-key from edges) with optional alpha-edge feathering
+function cutout(raw, tol, smooth){
+  const cut=removeFlatBackground(copyCanvas(raw), tol);
+  if(smooth>0){
+    const w=raw.width, h=raw.height;
+    const mask=document.createElement('canvas'); mask.width=w; mask.height=h;
+    const mg=mask.getContext('2d'); mg.filter='blur('+smooth+'px)'; mg.drawImage(cut,0,0);
+    const out=document.createElement('canvas'); out.width=w; out.height=h;
+    const og=out.getContext('2d'); og.drawImage(cut,0,0);
+    og.globalCompositeOperation='destination-in'; og.drawImage(mask,0,0);
+    return out;
+  }
+  return cut;
+}
+function aiToolsEnabled(on){ const r=$('#aiRemoveBtn'), o=$('#aiOrigBtn'); if(r)r.disabled=!on; if(o)o.disabled=!on; }
+function doRemoveBg(){
+  if(!LCAI.raw){ toast('Generate a logo first'); return; }
+  try{ LCAI.canvas=trimCanvas(cutout(LCAI.raw, LCAI.tol, LCAI.smooth)); LCAI.removed=true;
+    drawAiPreview(LCAI.canvas); $('#aiApply').disabled=false; }
+  catch(e){ setAiStatus('Background couldn’t be read (CORS) — try regenerating.','err'); }
+}
+function restoreOriginal(){
+  if(!LCAI.raw){ return; } LCAI.canvas=LCAI.raw; LCAI.removed=false;
+  drawAiPreview(LCAI.canvas); $('#aiApply').disabled=false;
+}
 function drawAiPreview(cv){
   const host=$('#aiPreview'), pc=$('#aiCanvas');
   const maxW=Math.max(80,host.clientWidth-28), maxH=240, r=Math.min(maxW/cv.width,maxH/cv.height,1);
@@ -1401,19 +1430,17 @@ function drawAiPreview(cv){
 function generateAI(){
   const base=($('#aiPrompt').value||'').trim(); if(!base){ toast('Enter a prompt first'); return; }
   const style=(AI_STYLES[LCAI.style]||AI_STYLES[0]).s;
-  const bg=LCAI.removeBg ? ', centered, isolated on a plain solid white background' : '';
-  const full=base+style+', game logo, sharp clean edges'+bg;
+  const full=base+style+', game logo, sharp clean edges, centered on a plain solid white background';
   const seed=Math.floor(Math.random()*1e6);
   const url='https://image.pollinations.ai/prompt/'+encodeURIComponent(full)+'?width=768&height=768&nologo=true&seed='+seed+'&model=flux';
-  const id=++aiReqId; LCAI.canvas=null; $('#aiApply').disabled=true;
+  const id=++aiReqId; LCAI.canvas=null; LCAI.raw=null; LCAI.removed=false;
+  $('#aiApply').disabled=true; aiToolsEnabled(false);
   setAiStatus('',null); aiBusy(true);
   const img=new Image(); img.crossOrigin='anonymous';
   img.onload=()=>{ if(id!==aiReqId)return; aiBusy(false);
-    let cv=document.createElement('canvas'); cv.width=img.naturalWidth; cv.height=img.naturalHeight;
+    const cv=document.createElement('canvas'); cv.width=img.naturalWidth; cv.height=img.naturalHeight;
     cv.getContext('2d').drawImage(img,0,0);
-    if(LCAI.removeBg){ try{ cv=trimCanvas(removeFlatBackground(cv,70)); }
-      catch(e){ setAiStatus('Generated, but background couldn’t be read (CORS). Applying as-is.','err'); } }
-    LCAI.canvas=cv; drawAiPreview(cv); $('#aiApply').disabled=false;
+    LCAI.raw=cv; LCAI.canvas=cv; drawAiPreview(cv); $('#aiApply').disabled=false; aiToolsEnabled(true);
   };
   img.onerror=()=>{ if(id!==aiReqId)return; aiBusy(false);
     setAiStatus('Generation failed — network may block pollinations.ai. Try again.','err'); };
@@ -1443,7 +1470,8 @@ function buildFontOptions(){
   const asel=$('#lcAiStyle')||$('#aiStyle'); if(asel&&!asel._built){ asel.innerHTML=AI_STYLES.map((s,i)=>`<option value="${i}">${s.label}</option>`).join(''); asel._built=true; }
 }
 function openLogoCreator(){ buildFontOptions(); syncLogoControls();
-  $('#aiStyle').value=LCAI.style; $('#aiRemoveBg').checked=LCAI.removeBg;
+  $('#aiStyle').value=LCAI.style; $('#aiTol').value=LCAI.tol; $('#aiSmooth').value=LCAI.smooth;
+  aiToolsEnabled(!!LCAI.raw);
   if(!$('#aiPrompt').value.trim()) rollAiPrompt();
   setLogoTab('text'); $('#logoModal').classList.add('open'); updateLogoPreview();
 }
@@ -1472,7 +1500,10 @@ function closeLogoCreator(){ $('#logoModal').classList.remove('open'); }
   $('#lcTabBtnText').addEventListener('click',()=>setLogoTab('text'));
   $('#lcTabBtnAI').addEventListener('click',()=>setLogoTab('ai'));
   $('#aiStyle').addEventListener('change',e=>{ LCAI.style=parseInt(e.target.value,10); });
-  $('#aiRemoveBg').addEventListener('change',e=>{ LCAI.removeBg=e.target.checked; });
+  $('#aiRemoveBtn').addEventListener('click',doRemoveBg);
+  $('#aiOrigBtn').addEventListener('click',restoreOriginal);
+  $('#aiTol').addEventListener('input',e=>{ LCAI.tol=parseInt(e.target.value,10); if(LCAI.removed)doRemoveBg(); });
+  $('#aiSmooth').addEventListener('input',e=>{ LCAI.smooth=parseInt(e.target.value,10); if(LCAI.removed)doRemoveBg(); });
   $('#aiDice').addEventListener('click',rollAiPrompt);
   $('#aiGen').addEventListener('click',generateAI);
   $('#aiApply').addEventListener('click',applyAI);
