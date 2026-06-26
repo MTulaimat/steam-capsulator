@@ -416,7 +416,7 @@
         <div class="lc-row"><span class="lab">Style</span><select id="aiStyle"></select><button type="button" class="action ghost" id="aiDice" style="padding:6px 8px;font-size:11px;flex:0 0 auto" title="Random prompt">🎲</button></div>
         <div class="lc-row"><span class="lab"></span><button type="button" class="action" id="aiGen" style="flex:1;padding:7px 10px">✨ Generate icon</button></div>
         <div class="lc-row" id="aiStatusRow" style="display:none"><span class="lab"></span><small class="ai-status" id="aiStatus"></small></div>
-        <div class="lc-row"><span class="lab">Icon size</span><input type="range" id="aiIconSize" min="10" max="130" step="2" disabled></div>
+        <div class="lc-row"><span class="lab">Icon size</span><input type="range" id="aiIconSize" min="15" max="240" step="2" disabled></div>
         <div class="lc-row"><span class="lab">Cutout</span><button type="button" class="action ghost" id="aiRemoveBtn" style="flex:1;padding:6px 8px;font-size:11px" disabled>Remove bg</button><button type="button" class="action ghost" id="aiOrigBtn" style="padding:6px 8px;font-size:11px;flex:0 0 auto" disabled>Original</button></div>
         <div class="lc-row"><span class="lab">Tolerance</span><input type="range" id="aiTol" min="10" max="170" step="2"></div>
         <div class="lc-row"><span class="lab">Smoothing</span><input type="range" id="aiSmooth" min="0" max="8" step="1"></div>
@@ -461,7 +461,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = '2.8';
+const APP_VERSION = '2.9';
 
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
@@ -1214,14 +1214,24 @@ const LC = {
   plateStrokeOn:false, plateStrokeW:6, plateStrokeColor:'#ffffff',
 };
 // Composite layout for the Create tab: a text logo plus an optional AI icon, each
-// positioned by its centre as a fraction of an artboard sized relative to the text.
-const COMP = { text:{x:0.5, y:0.60}, icon:{x:0.5, y:0.28, scale:0.42}, hasIcon:false, iconPlaced:false };
+// positioned by its centre as a fraction of an artboard. The artboard is sized to the
+// content plus a generous margin, so both elements have room to move without clipping.
+// Icon size is stored relative to the text height so it's stable as the artboard grows.
+const COMP = { text:{x:0.5, y:0.50}, icon:{x:0.5, y:0.36, scale:0.9}, hasIcon:false, iconPlaced:false };
 function compGeometry(txt){
   const TW=txt.width, TH=txt.height;
-  const ARTW=Math.round(Math.max(TW, TH*1.1)*1.5), ARTH=Math.round(TH*2.4);
+  let ic=null, iw=0, ih=0;
+  if(COMP.hasIcon && LCAI.canvas){ ic=LCAI.canvas; ih=COMP.icon.scale*TH; iw=ic.width/ic.height*ih; }
+  const pad = ic ? Math.max(TH, ih)*1.1 : TH*0.4;      // generous breathing room when an icon is present
+  const ARTW = Math.round(Math.max(TW, iw) + pad*2);
+  const ARTH = Math.round(TH + ih + pad*2);
+  // keep each element's bounding box fully inside the artboard so nothing gets clipped
+  const clamp=(t,w,h)=>{ const hw=Math.min(.5,w/2/ARTW), hh=Math.min(.5,h/2/ARTH);
+    t.x=Math.min(1-hw,Math.max(hw,t.x)); t.y=Math.min(1-hh,Math.max(hh,t.y)); };
+  clamp(COMP.text, TW, TH);
   const text={ w:TW, h:TH, cx:COMP.text.x*ARTW, cy:COMP.text.y*ARTH };
   let icon=null;
-  if(COMP.hasIcon && LCAI.canvas){ const ic=LCAI.canvas, ih=COMP.icon.scale*ARTH, iw=ic.width/ic.height*ih;
+  if(ic){ clamp(COMP.icon, iw, ih);
     icon={ img:ic, w:iw, h:ih, cx:COMP.icon.x*ARTW, cy:COMP.icon.y*ARTH }; }
   return {ARTW,ARTH,text,icon};
 }
@@ -1456,11 +1466,11 @@ function restoreOriginal(){
   updateLogoPreview();
 }
 function placeIcon(){ COMP.hasIcon=true;
-  if(!COMP.iconPlaced){ COMP.iconPlaced=true; COMP.icon={x:0.5,y:0.27,scale:0.42}; COMP.text.y=0.66; }
+  if(!COMP.iconPlaced){ COMP.iconPlaced=true; COMP.icon={x:0.5,y:0.30,scale:0.9}; COMP.text.y=0.66; }
   $('#aiIconSize').value=Math.round(COMP.icon.scale*100);
 }
 function clearIcon(){ COMP.hasIcon=false; COMP.iconPlaced=false; LCAI.raw=null; LCAI.canvas=null; LCAI.removed=false;
-  COMP.text.y=0.60; aiToolsEnabled(false); setAiStatus('',null); updateLogoPreview(); }
+  COMP.text.y=0.50; aiToolsEnabled(false); setAiStatus('',null); updateLogoPreview(); }
 function generateAI(){
   const base=($('#aiPrompt').value||'').trim(); if(!base){ toast('Enter a prompt first'); return; }
   const style=(AI_STYLES[LCAI.style]||AI_STYLES[0]).s;
