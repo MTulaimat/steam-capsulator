@@ -208,7 +208,12 @@
   .lc-grid{display:grid;grid-template-columns:1fr;gap:14px}
   @media(min-width:700px){ .lc-grid{grid-template-columns:300px 1fr} }
   .lc-preview{background:repeating-conic-gradient(#2a3340 0% 25%, #232b36 0% 50%) 50%/18px 18px;border:1px solid var(--line);border-radius:8px;min-height:200px;display:flex;align-items:center;justify-content:center;padding:12px;overflow:hidden}
-  .lc-preview canvas{max-width:100%;max-height:260px;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5))}
+  .lc-preview canvas{max-width:100%;max-height:300px;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5))}
+  #lcPreview canvas{cursor:grab;touch-action:none}
+  #lcPreview canvas:active{cursor:grabbing}
+  .lc-hint{position:absolute;left:8px;bottom:6px;font-size:10px;color:var(--muted);background:rgba(8,12,16,.55);padding:2px 7px;border-radius:8px;pointer-events:none}
+  .lc-drop{display:flex;align-items:center;justify-content:center;text-align:center;min-height:120px;border:2px dashed var(--line);border-radius:8px;color:var(--muted);font-size:13px;cursor:pointer;padding:18px;transition:.15s}
+  .lc-drop:hover,.lc-drop.over{border-color:var(--accent);color:#fff}
   .lc-controls{display:flex;flex-direction:column}
   .lc-tabs{display:flex;gap:4px;margin:2px 0 14px;border-bottom:1px solid var(--line)}
   .lc-tab{background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:-1px}
@@ -217,9 +222,10 @@
   .lc-preview{position:relative}
   .lc-row textarea{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:7px 9px;font:13px/1.4 inherit;resize:vertical}
   .lc-row textarea:focus{outline:none;border-color:var(--accent)}
-  .ai-status{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;color:var(--muted);font-size:12px;line-height:1.5;pointer-events:none}
+  .ai-status{color:var(--muted);font-size:11px;line-height:1.4}
   .ai-status.err{color:var(--bad)}
   .ai-status.busy{color:var(--accent)}
+  .lc-sub{color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px}
   .lc-row{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:12px;color:var(--text)}
   .lc-row .lab{flex:0 0 58px;color:var(--muted)}
   .lc-row .tog{flex:0 0 96px;display:flex;align-items:center;gap:6px;color:var(--text);cursor:pointer;user-select:none}
@@ -268,12 +274,8 @@
       <b>① Background</b><small id="bgName">Click / drop image</small>
       <input type="file" id="bgInput" accept="image/*" />
     </label>
-    <label class="upload-btn hint" id="logoBtn">
-      <b>② Logo <span class="badge">optional</span></b><small id="logoName">Skip if bg has logo</small>
-      <input type="file" id="logoInput" accept="image/*" />
-    </label>
-    <button type="button" class="upload-btn lc-open" id="logoCreateBtn" title="Create a logo from text or AI">
-      <b>✎ Logo Creator</b><small>Text or AI logo</small>
+    <button type="button" class="upload-btn hint lc-open" id="logoBtn" title="Upload or create a logo">
+      <b>② Logo <span class="badge">optional</span></b><small id="logoName">Upload or create</small>
     </button>
   </div>
   <div class="spacer"></div>
@@ -367,16 +369,28 @@
 </div>
 
 <div class="modal" id="logoModal">
-  <div class="dialog" style="width:min(780px,95vw)">
-    <h2>Logo Creator</h2>
+  <div class="dialog" style="width:min(820px,95vw)">
+    <h2>Logo</h2>
     <div class="lc-tabs">
-      <button type="button" class="lc-tab active" id="lcTabBtnText">✎ Text</button>
-      <button type="button" class="lc-tab" id="lcTabBtnAI">✨ AI generate</button>
+      <button type="button" class="lc-tab active" id="lcTabBtnUpload">⬆ Upload</button>
+      <button type="button" class="lc-tab" id="lcTabBtnCreate">✎ Create</button>
     </div>
-    <div id="lcTabText">
-    <p>Design a text logo — tweak the style or hit randomize, then Apply to use it across every capsule (instead of uploading one).</p>
+    <div id="lcTabUpload">
+    <p>Upload your own logo image. A PNG with a transparent background works best.</p>
+    <label class="lc-drop" id="lcDrop">
+      <input type="file" id="logoInput" accept="image/*" hidden>
+      <span id="lcDropLabel">Click or drop an image here</span>
+    </label>
+    <div class="lc-preview" id="upPreview" style="margin-top:14px"><canvas id="upCanvas"></canvas><div class="ai-status" id="upStatus" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">No image yet</div></div>
+    <div class="dialog-actions">
+      <button class="action ghost" id="upCancel">Cancel</button>
+      <button class="action" id="upApply" disabled>Apply logo</button>
+    </div>
+    </div>
+    <div id="lcTabCreate" style="display:none">
+    <p>Design a text logo, then optionally generate an AI icon to place on top. Drag either one in the preview to position it.</p>
     <div class="lc-grid">
-      <div class="lc-preview" id="lcPreview"><canvas id="lcCanvas"></canvas></div>
+      <div class="lc-preview" id="lcPreview"><canvas id="lcCanvas"></canvas><div class="lc-hint" id="lcDragHint" style="display:none">Drag text / icon to move</div></div>
       <div class="lc-controls">
         <div class="lc-row"><span class="lab">Line 1</span><input type="text" id="lcLine1" maxlength="40" placeholder="Game title"></div>
         <div class="lc-row"><span class="lab">Line 2</span><input type="text" id="lcLine2" maxlength="40" placeholder="Subtitle (optional)"></div>
@@ -396,33 +410,23 @@
         <div class="lc-row"><span class="lab">Size</span><input type="range" id="lcPlatePad" min="0" max="120" step="2"><span class="lab" style="flex:0 0 auto">Shape</span><input type="range" id="lcPlateMod" min="0" max="100" step="2"></div>
         <div class="lc-row"><span class="lab">Rotate</span><input type="range" id="lcPlateRotate" min="-45" max="45" step="1"></div>
         <div class="lc-row"><label class="tog"><input type="checkbox" id="lcPlateStroke"> Border</label><input type="range" id="lcPlateStrokeW" min="1" max="24" step="1"><input type="color" id="lcPlateStrokeColor"></div>
-      </div>
-    </div>
-    <div class="dialog-actions">
-      <button class="action ghost" id="lcRandom" style="margin-right:auto">🎲 Randomize</button>
-      <button class="action ghost" id="lcCancel">Cancel</button>
-      <button class="action" id="lcApply">Apply logo</button>
-    </div>
-    </div>
-    <div id="lcTabAI" style="display:none">
-    <p>Describe a logo and generate it free via <b>Pollinations.ai</b>. Your prompt is sent to their servers; results are AI art (raster), so transparency is best-effort.</p>
-    <div class="lc-grid">
-      <div class="lc-preview" id="aiPreview"><canvas id="aiCanvas"></canvas><div class="ai-status" id="aiStatus">Enter a prompt, then hit Generate</div></div>
-      <div class="lc-controls">
-        <div class="lc-row" style="align-items:flex-start"><span class="lab" style="margin-top:6px">Prompt</span><textarea id="aiPrompt" rows="4" placeholder="e.g. fierce dragon emblem, esports mascot logo"></textarea></div>
-        <div class="lc-row"><span class="lab"></span><button type="button" class="action ghost" id="aiDice" style="padding:6px 10px;font-size:12px">🎲 Random prompt</button></div>
-        <div class="lc-row"><span class="lab">Style</span><select id="aiStyle"></select></div>
         <hr class="lc-sep">
-        <div class="lc-row"><button type="button" class="action ghost" id="aiRemoveBtn" style="flex:1;padding:7px 10px;font-size:12px" disabled>Remove background</button><button type="button" class="action ghost" id="aiOrigBtn" style="padding:7px 10px;font-size:12px" disabled>Original</button></div>
+        <div class="lc-row" style="justify-content:space-between"><span class="lc-sub">✨ AI icon <span class="badge">experimental</span></span><button type="button" class="action ghost" id="aiClearIcon" style="padding:4px 9px;font-size:11px" disabled>Remove icon</button></div>
+        <div class="lc-row" style="align-items:flex-start"><span class="lab" style="margin-top:6px">Prompt</span><textarea id="aiPrompt" rows="2" placeholder="e.g. fierce dragon emblem"></textarea></div>
+        <div class="lc-row"><span class="lab">Style</span><select id="aiStyle"></select><button type="button" class="action ghost" id="aiDice" style="padding:6px 8px;font-size:11px;flex:0 0 auto" title="Random prompt">🎲</button></div>
+        <div class="lc-row"><span class="lab"></span><button type="button" class="action" id="aiGen" style="flex:1;padding:7px 10px">✨ Generate icon</button></div>
+        <div class="lc-row" id="aiStatusRow" style="display:none"><span class="lab"></span><small class="ai-status" id="aiStatus"></small></div>
+        <div class="lc-row"><span class="lab">Icon size</span><input type="range" id="aiIconSize" min="10" max="130" step="2" disabled></div>
+        <div class="lc-row"><span class="lab">Cutout</span><button type="button" class="action ghost" id="aiRemoveBtn" style="flex:1;padding:6px 8px;font-size:11px" disabled>Remove bg</button><button type="button" class="action ghost" id="aiOrigBtn" style="padding:6px 8px;font-size:11px;flex:0 0 auto" disabled>Original</button></div>
         <div class="lc-row"><span class="lab">Tolerance</span><input type="range" id="aiTol" min="10" max="170" step="2"></div>
         <div class="lc-row"><span class="lab">Smoothing</span><input type="range" id="aiSmooth" min="0" max="8" step="1"></div>
-        <div class="lc-row"><small style="color:var(--muted);font-size:11px;line-height:1.4">Generate, then remove the background and tune tolerance / smoothing without regenerating. Generate again for a new variation.</small></div>
+        <div class="lc-row"><small style="color:var(--muted);font-size:11px;line-height:1.4">Generated free via <b>Pollinations.ai</b> — your prompt is sent to their servers. Results are AI art (raster), so transparency is best-effort.</small></div>
       </div>
     </div>
     <div class="dialog-actions">
-      <button class="action ghost" id="aiCancel" style="margin-right:auto">Cancel</button>
-      <button class="action ghost" id="aiGen">✨ Generate</button>
-      <button class="action" id="aiApply" disabled>Apply logo</button>
+      <button class="action ghost" id="lcRandom" style="margin-right:auto">🎲 Randomize text</button>
+      <button class="action ghost" id="lcCancel">Cancel</button>
+      <button class="action" id="lcApply">Apply logo</button>
     </div>
     </div>
   </div>
@@ -457,7 +461,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = '2.7';
+const APP_VERSION = '2.8';
 
 /* ---------- Capsule definitions (from Steam Asset Guidelines) ---------- */
 const CAPSULES = [
@@ -539,12 +543,10 @@ function loadFile(file, slot){
   img.src=url;
 }
 $('#bgInput').addEventListener('change',e=>loadFile(e.target.files[0],'bg'));
-$('#logoInput').addEventListener('change',e=>loadFile(e.target.files[0],'logo'));
 ['dragover','drop'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault()));
 $('#bgBtn').addEventListener('drop',e=>loadFile(e.dataTransfer.files[0],'bg'));
-$('#logoBtn').addEventListener('drop',e=>loadFile(e.dataTransfer.files[0],'logo'));
 $('#clearLogo').addEventListener('click',()=>{
-  IMG.logo=null; $('#logoName').textContent='Skip if bg has logo'; $('#logoBtn').classList.remove('loaded');
+  IMG.logo=null; $('#logoName').textContent='Upload or create'; $('#logoBtn').classList.remove('loaded');
   $('#logoInput').value=''; toast('Logo removed from all capsules'); refreshAll();
 });
 $('#fmtSel').addEventListener('change',e=>{ fmt=e.target.value; if($('#controls').style.display!=='none')buildControls(); });
@@ -1211,6 +1213,26 @@ const LC = {
   plateShape:0, platePad:30, plateMod:40, plateRotate:0,
   plateStrokeOn:false, plateStrokeW:6, plateStrokeColor:'#ffffff',
 };
+// Composite layout for the Create tab: a text logo plus an optional AI icon, each
+// positioned by its centre as a fraction of an artboard sized relative to the text.
+const COMP = { text:{x:0.5, y:0.60}, icon:{x:0.5, y:0.28, scale:0.42}, hasIcon:false, iconPlaced:false };
+function compGeometry(txt){
+  const TW=txt.width, TH=txt.height;
+  const ARTW=Math.round(Math.max(TW, TH*1.1)*1.5), ARTH=Math.round(TH*2.4);
+  const text={ w:TW, h:TH, cx:COMP.text.x*ARTW, cy:COMP.text.y*ARTH };
+  let icon=null;
+  if(COMP.hasIcon && LCAI.canvas){ const ic=LCAI.canvas, ih=COMP.icon.scale*ARTH, iw=ic.width/ic.height*ih;
+    icon={ img:ic, w:iw, h:ih, cx:COMP.icon.x*ARTW, cy:COMP.icon.y*ARTH }; }
+  return {ARTW,ARTH,text,icon};
+}
+function renderComposite(scale){
+  const txt=renderTextLogo(scale), G=compGeometry(txt);
+  const cv=document.createElement('canvas'); cv.width=G.ARTW; cv.height=G.ARTH;
+  const g=cv.getContext('2d'); g.imageSmoothingQuality='high';
+  g.drawImage(txt, G.text.cx-G.text.w/2, G.text.cy-G.text.h/2);
+  if(G.icon) g.drawImage(G.icon.img, G.icon.cx-G.icon.w/2, G.icon.cy-G.icon.h/2, G.icon.w, G.icon.h);
+  return cv;
+}
 function hslToHex(h,s,l){ s/=100; l/=100;
   const a=s*Math.min(l,1-l), f=n=>{const k=(n+h/30)%12, c=l-a*Math.max(-1,Math.min(k-3,9-k,1));
     return Math.round(255*c).toString(16).padStart(2,'0');};
@@ -1303,13 +1325,22 @@ function renderTextLogo(scale){
   });
   return trimCanvas(cv);
 }
+let lcView={scale:1, ARTW:1, ARTH:1, geom:null};
 function updateLogoPreview(){
-  const cv=renderTextLogo(1.5), host=$('#lcPreview'), pc=$('#lcCanvas');
-  const maxW=Math.max(80,host.clientWidth-28), maxH=240;
-  const r=Math.min(maxW/cv.width, maxH/cv.height, 1);
-  pc.width=Math.max(1,Math.round(cv.width*r)); pc.height=Math.max(1,Math.round(cv.height*r));
-  const g=pc.getContext('2d'); g.imageSmoothingQuality='high';
-  g.clearRect(0,0,pc.width,pc.height); g.drawImage(cv,0,0,pc.width,pc.height);
+  const txt=renderTextLogo(1.5), G=compGeometry(txt), host=$('#lcPreview'), pc=$('#lcCanvas');
+  const maxW=Math.max(80,host.clientWidth-28), maxH=300;
+  const r=Math.min(maxW/G.ARTW, maxH/G.ARTH, 1);
+  pc.width=Math.max(1,Math.round(G.ARTW*r)); pc.height=Math.max(1,Math.round(G.ARTH*r));
+  const g=pc.getContext('2d'); g.imageSmoothingQuality='high'; g.clearRect(0,0,pc.width,pc.height);
+  g.drawImage(G.text.img||txt, (G.text.cx-G.text.w/2)*r, (G.text.cy-G.text.h/2)*r, G.text.w*r, G.text.h*r);
+  if(G.icon){
+    g.drawImage(G.icon.img, (G.icon.cx-G.icon.w/2)*r, (G.icon.cy-G.icon.h/2)*r, G.icon.w*r, G.icon.h*r);
+    // faint frame around the icon so it's clear it can be dragged independently
+    g.save(); g.strokeStyle='rgba(102,192,244,.5)'; g.lineWidth=1; g.setLineDash([4,4]);
+    g.strokeRect((G.icon.cx-G.icon.w/2)*r, (G.icon.cy-G.icon.h/2)*r, G.icon.w*r, G.icon.h*r); g.restore();
+  }
+  lcView={scale:r, ARTW:G.ARTW, ARTH:G.ARTH, geom:G};
+  $('#lcDragHint').style.display=G.icon?'':'none';
 }
 function syncLogoControls(){
   const set=(id,v)=>{const e=$(id); if(!e)return; if(e.type==='checkbox')e.checked=v; else e.value=v;};
@@ -1342,14 +1373,17 @@ function randomizeLogo(){
   syncLogoControls(); updateLogoPreview();
 }
 function applyLogoCreator(){
-  if(!LC.line1.trim() && !LC.line2.trim()){ toast('Enter some text first'); return; }
-  const cv=renderTextLogo(3);
+  const hasText=!!(LC.line1.trim()||LC.line2.trim());
+  if(!hasText && !COMP.hasIcon){ toast('Add some text or generate an icon first'); return; }
+  let cv;
+  if(!hasText && COMP.hasIcon) cv=trimCanvas(copyCanvas(LCAI.canvas)); // icon only — keep full resolution
+  else cv=trimCanvas(renderComposite(3));
   IMG.logo={img:cv, w:cv.width, h:cv.height};
   document.querySelectorAll('.upload-btn.hint').forEach(b=>b.classList.remove('hint'));
   CAPSULES.forEach(c=>{ ST[c.id].logo.init=false; });
-  $('#logoName').textContent='Text logo'; $('#logoBtn').classList.add('loaded');
-  $('#logoInput').value='';
-  closeLogoCreator(); refreshAll(); toast('Text logo applied to all capsules');
+  $('#logoName').textContent=COMP.hasIcon?(hasText?'Text + AI logo':'AI logo'):'Text logo';
+  $('#logoBtn').classList.add('loaded'); $('#logoInput').value='';
+  closeLogoCreator(); refreshAll(); toast('Logo applied to all capsules');
 }
 /* ---------- AI generate (Pollinations.ai) ---------- */
 const AI_PROMPTS=[
@@ -1379,9 +1413,9 @@ let aiReqId=0;
 function copyCanvas(src){ const c=document.createElement('canvas'); c.width=src.width; c.height=src.height; c.getContext('2d').drawImage(src,0,0); return c; }
 function setAiStatus(text, kind){ const e=$('#aiStatus'); if(!e)return;
   e.textContent=text||''; e.classList.toggle('err',kind==='err'); e.classList.toggle('busy',kind==='busy');
-  e.style.display=text?'flex':'none';
+  const row=$('#aiStatusRow'); if(row) row.style.display=text?'':'none';
 }
-function aiBusy(on){ const b=$('#aiGen'); if(!b)return; b.disabled=on; b.textContent=on?'⏳ Generating…':'✨ Generate'; }
+function aiBusy(on){ const b=$('#aiGen'); if(!b)return; b.disabled=on; b.textContent=on?'⏳ Generating…':'✨ Generate icon'; }
 function removeFlatBackground(cv, tol){
   const g=cv.getContext('2d'), w=cv.width, h=cv.height, id=g.getImageData(0,0,w,h), d=id.data;
   const corners=[[0,0],[w-1,0],[0,h-1],[w-1,h-1]]; let r=0,gn=0,b=0;
@@ -1410,70 +1444,91 @@ function cutout(raw, tol, smooth){
   }
   return cut;
 }
-function aiToolsEnabled(on){ const r=$('#aiRemoveBtn'), o=$('#aiOrigBtn'); if(r)r.disabled=!on; if(o)o.disabled=!on; }
+function aiToolsEnabled(on){ ['#aiRemoveBtn','#aiOrigBtn','#aiIconSize','#aiClearIcon'].forEach(id=>{ const e=$(id); if(e)e.disabled=!on; }); }
 function doRemoveBg(){
-  if(!LCAI.raw){ toast('Generate a logo first'); return; }
+  if(!LCAI.raw){ toast('Generate an icon first'); return; }
   try{ LCAI.canvas=trimCanvas(cutout(LCAI.raw, LCAI.tol, LCAI.smooth)); LCAI.removed=true;
-    drawAiPreview(LCAI.canvas); $('#aiApply').disabled=false; }
+    setAiStatus('',null); updateLogoPreview(); }
   catch(e){ setAiStatus('Background couldn’t be read (CORS) — try regenerating.','err'); }
 }
 function restoreOriginal(){
   if(!LCAI.raw){ return; } LCAI.canvas=LCAI.raw; LCAI.removed=false;
-  drawAiPreview(LCAI.canvas); $('#aiApply').disabled=false;
+  updateLogoPreview();
 }
-function drawAiPreview(cv){
-  const host=$('#aiPreview'), pc=$('#aiCanvas');
-  const maxW=Math.max(80,host.clientWidth-28), maxH=240, r=Math.min(maxW/cv.width,maxH/cv.height,1);
-  pc.width=Math.max(1,Math.round(cv.width*r)); pc.height=Math.max(1,Math.round(cv.height*r));
-  const g=pc.getContext('2d'); g.clearRect(0,0,pc.width,pc.height); g.drawImage(cv,0,0,pc.width,pc.height);
+function placeIcon(){ COMP.hasIcon=true;
+  if(!COMP.iconPlaced){ COMP.iconPlaced=true; COMP.icon={x:0.5,y:0.27,scale:0.42}; COMP.text.y=0.66; }
+  $('#aiIconSize').value=Math.round(COMP.icon.scale*100);
 }
+function clearIcon(){ COMP.hasIcon=false; COMP.iconPlaced=false; LCAI.raw=null; LCAI.canvas=null; LCAI.removed=false;
+  COMP.text.y=0.60; aiToolsEnabled(false); setAiStatus('',null); updateLogoPreview(); }
 function generateAI(){
   const base=($('#aiPrompt').value||'').trim(); if(!base){ toast('Enter a prompt first'); return; }
   const style=(AI_STYLES[LCAI.style]||AI_STYLES[0]).s;
-  const full=base+style+', game logo, sharp clean edges, centered on a plain solid white background';
+  const full=base+style+', game icon emblem, sharp clean edges, centered on a plain solid white background';
   const seed=Math.floor(Math.random()*1e6);
   const url='https://image.pollinations.ai/prompt/'+encodeURIComponent(full)+'?width=768&height=768&nologo=true&seed='+seed+'&model=flux';
   const id=++aiReqId; LCAI.canvas=null; LCAI.raw=null; LCAI.removed=false;
-  $('#aiApply').disabled=true; aiToolsEnabled(false);
-  setAiStatus('',null); aiBusy(true);
+  aiToolsEnabled(false); setAiStatus('Generating…','busy'); aiBusy(true);
   const img=new Image(); img.crossOrigin='anonymous';
   img.onload=()=>{ if(id!==aiReqId)return; aiBusy(false);
     const cv=document.createElement('canvas'); cv.width=img.naturalWidth; cv.height=img.naturalHeight;
-    cv.getContext('2d').drawImage(img,0,0);
-    LCAI.raw=cv; LCAI.canvas=cv; drawAiPreview(cv); $('#aiApply').disabled=false; aiToolsEnabled(true);
+    cv.getContext('2d').drawImage(img,0,0); LCAI.raw=cv;
+    // auto-cut the plain white background so the icon drops cleanly onto the text
+    try{ LCAI.canvas=trimCanvas(cutout(cv, LCAI.tol, LCAI.smooth)); LCAI.removed=true; setAiStatus('',null); }
+    catch(e){ LCAI.canvas=cv; LCAI.removed=false; setAiStatus('Couldn’t auto-cut background (CORS) — showing original.','err'); }
+    placeIcon(); aiToolsEnabled(true); updateLogoPreview();
   };
   img.onerror=()=>{ if(id!==aiReqId)return; aiBusy(false);
     setAiStatus('Generation failed — network may block pollinations.ai. Try again.','err'); };
   img.src=url;
 }
-function applyAI(){
-  if(!LCAI.canvas){ toast('Generate a logo first'); return; }
-  const cv=LCAI.canvas; IMG.logo={img:cv, w:cv.width, h:cv.height};
-  document.querySelectorAll('.upload-btn.hint').forEach(b=>b.classList.remove('hint'));
-  CAPSULES.forEach(c=>{ ST[c.id].logo.init=false; });
-  $('#logoName').textContent='AI logo'; $('#logoBtn').classList.add('loaded'); $('#logoInput').value='';
-  closeLogoCreator(); refreshAll(); toast('AI logo applied to all capsules');
-}
 function rollAiPrompt(){ const p=AI_PROMPTS[Math.floor(Math.random()*AI_PROMPTS.length)];
   $('#aiPrompt').value=p; }
-function setLogoTab(which){
-  const text=(which==='text');
-  $('#lcTabText').style.display=text?'':'none';
-  $('#lcTabAI').style.display=text?'none':'';
-  $('#lcTabBtnText').classList.toggle('active',text);
-  $('#lcTabBtnAI').classList.toggle('active',!text);
-  if(text) updateLogoPreview();
+function setLogoMode(which){
+  const create=(which==='create');
+  $('#lcTabCreate').style.display=create?'':'none';
+  $('#lcTabUpload').style.display=create?'none':'';
+  $('#lcTabBtnCreate').classList.toggle('active',create);
+  $('#lcTabBtnUpload').classList.toggle('active',!create);
+  if(create) updateLogoPreview();
+}
+/* ---------- Upload tab ---------- */
+let upImg=null;
+function drawUpPreview(){
+  if(!upImg)return; const host=$('#upPreview'), pc=$('#upCanvas');
+  const maxW=Math.max(80,host.clientWidth-28), maxH=240, r=Math.min(maxW/upImg.w, maxH/upImg.h, 1);
+  pc.width=Math.max(1,Math.round(upImg.w*r)); pc.height=Math.max(1,Math.round(upImg.h*r));
+  const g=pc.getContext('2d'); g.clearRect(0,0,pc.width,pc.height); g.drawImage(upImg.img,0,0,pc.width,pc.height);
+  $('#upStatus').style.display='none';
+}
+function handleUploadFile(file){
+  if(!file)return;
+  const img=new Image();
+  img.onload=()=>{ upImg={img,w:img.naturalWidth,h:img.naturalHeight,name:file.name};
+    drawUpPreview(); $('#upApply').disabled=false; };
+  img.src=URL.createObjectURL(file);
+}
+function applyUpload(){
+  if(!upImg){ toast('Choose an image first'); return; }
+  IMG.logo={img:upImg.img, w:upImg.w, h:upImg.h};
+  document.querySelectorAll('.upload-btn.hint').forEach(b=>b.classList.remove('hint'));
+  CAPSULES.forEach(c=>{ ST[c.id].logo.init=false; });
+  $('#logoName').textContent=upImg.name||'Uploaded logo'; $('#logoBtn').classList.add('loaded');
+  closeLogoCreator(); refreshAll(); toast('Logo applied to all capsules');
 }
 function buildFontOptions(){
   const sel=$('#lcFont'); if(sel&&!sel._built){ sel.innerHTML=LOGO_FONTS.map((f,i)=>`<option value="${i}">${f.label}</option>`).join(''); sel._built=true; }
   const psel=$('#lcPlateShape'); if(psel&&!psel._built){ psel.innerHTML=PLATE_SHAPES.map((s,i)=>`<option value="${i}">${s.label}</option>`).join(''); psel._built=true; }
   const asel=$('#lcAiStyle')||$('#aiStyle'); if(asel&&!asel._built){ asel.innerHTML=AI_STYLES.map((s,i)=>`<option value="${i}">${s.label}</option>`).join(''); asel._built=true; }
 }
-function openLogoCreator(){ buildFontOptions(); syncLogoControls();
+function openLogoCreator(mode){ buildFontOptions(); syncLogoControls();
   $('#aiStyle').value=LCAI.style; $('#aiTol').value=LCAI.tol; $('#aiSmooth').value=LCAI.smooth;
-  aiToolsEnabled(!!LCAI.raw);
+  $('#aiIconSize').value=Math.round(COMP.icon.scale*100);
+  aiToolsEnabled(COMP.hasIcon && !!LCAI.canvas);
   if(!$('#aiPrompt').value.trim()) rollAiPrompt();
-  setLogoTab('text'); $('#logoModal').classList.add('open'); updateLogoPreview();
+  if(upImg){ $('#upApply').disabled=false; }
+  setLogoMode(mode||'upload'); $('#logoModal').classList.add('open');
+  if(upImg) drawUpPreview();
 }
 function closeLogoCreator(){ $('#logoModal').classList.remove('open'); }
 (function wireLogoCreator(){
@@ -1491,23 +1546,53 @@ function closeLogoCreator(){ $('#logoModal').classList.remove('open'); }
   bind('#lcPlate','plateOn'); bind('#lcPlateOpacity','plateOpacity','int'); bind('#lcPlateColor','plateColor');
   bind('#lcPlateShape','plateShape','int'); bind('#lcPlatePad','platePad','int'); bind('#lcPlateMod','plateMod','int'); bind('#lcPlateRotate','plateRotate','int');
   bind('#lcPlateStroke','plateStrokeOn'); bind('#lcPlateStrokeW','plateStrokeW','int'); bind('#lcPlateStrokeColor','plateStrokeColor');
-  $('#logoCreateBtn').addEventListener('click',openLogoCreator);
+  $('#logoBtn').addEventListener('click',()=>openLogoCreator('upload'));
   $('#lcRandom').addEventListener('click',randomizeLogo);
   $('#lcApply').addEventListener('click',applyLogoCreator);
   $('#lcCancel').addEventListener('click',closeLogoCreator);
   $('#logoModal').addEventListener('click',e=>{ if(e.target.id==='logoModal')closeLogoCreator(); });
-  // tabs + AI generator
-  $('#lcTabBtnText').addEventListener('click',()=>setLogoTab('text'));
-  $('#lcTabBtnAI').addEventListener('click',()=>setLogoTab('ai'));
+  // top-level tabs
+  $('#lcTabBtnUpload').addEventListener('click',()=>setLogoMode('upload'));
+  $('#lcTabBtnCreate').addEventListener('click',()=>setLogoMode('create'));
+  // upload tab
+  $('#logoInput').addEventListener('change',e=>handleUploadFile(e.target.files[0]));
+  $('#upApply').addEventListener('click',applyUpload);
+  $('#upCancel').addEventListener('click',closeLogoCreator);
+  const drop=$('#lcDrop');
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop',e=>handleUploadFile(e.dataTransfer.files[0]));
+  // header drop → open upload tab with the file
+  $('#logoBtn').addEventListener('drop',e=>{ openLogoCreator('upload'); handleUploadFile(e.dataTransfer.files[0]); });
+  // AI icon generator (composited onto the text in the Create tab)
   $('#aiStyle').addEventListener('change',e=>{ LCAI.style=parseInt(e.target.value,10); });
   $('#aiRemoveBtn').addEventListener('click',doRemoveBg);
   $('#aiOrigBtn').addEventListener('click',restoreOriginal);
   $('#aiTol').addEventListener('input',e=>{ LCAI.tol=parseInt(e.target.value,10); if(LCAI.removed)doRemoveBg(); });
   $('#aiSmooth').addEventListener('input',e=>{ LCAI.smooth=parseInt(e.target.value,10); if(LCAI.removed)doRemoveBg(); });
+  $('#aiIconSize').addEventListener('input',e=>{ COMP.icon.scale=Math.max(0.05,parseInt(e.target.value,10)/100); updateLogoPreview(); });
+  $('#aiClearIcon').addEventListener('click',clearIcon);
   $('#aiDice').addEventListener('click',rollAiPrompt);
   $('#aiGen').addEventListener('click',generateAI);
-  $('#aiApply').addEventListener('click',applyAI);
-  $('#aiCancel').addEventListener('click',closeLogoCreator);
+  // drag text / icon to position them in the composite preview
+  const pc=$('#lcCanvas'); let drag=null;
+  const evNorm=ev=>{ const rect=pc.getBoundingClientRect();
+    const px=(ev.clientX-rect.left)*(pc.width/rect.width), py=(ev.clientY-rect.top)*(pc.height/rect.height);
+    return { nx:(px/lcView.scale)/lcView.ARTW, ny:(py/lcView.scale)/lcView.ARTH }; };
+  const hit=(p,el)=>{ const hw=el.w/2/lcView.ARTW, hh=el.h/2/lcView.ARTH, cx=el.cx/lcView.ARTW, cy=el.cy/lcView.ARTH;
+    return Math.abs(p.nx-cx)<=hw && Math.abs(p.ny-cy)<=hh; };
+  pc.addEventListener('pointerdown',ev=>{ const G=lcView.geom; if(!G)return; const p=evNorm(ev);
+    let target=null;
+    if(G.icon && hit(p,G.icon)) target='icon';        // icon sits on top → test first
+    else if(G.text && hit(p,G.text)) target='text';
+    if(!target)return;
+    const t=COMP[target]; drag={target, dx:p.nx-t.x, dy:p.ny-t.y};
+    pc.setPointerCapture(ev.pointerId); ev.preventDefault();
+  });
+  pc.addEventListener('pointermove',ev=>{ if(!drag)return; const p=evNorm(ev);
+    const t=COMP[drag.target]; t.x=p.nx-drag.dx; t.y=p.ny-drag.dy; updateLogoPreview(); });
+  const endDrag=ev=>{ if(!drag)return; drag=null; try{pc.releasePointerCapture(ev.pointerId);}catch(_){} };
+  pc.addEventListener('pointerup',endDrag); pc.addEventListener('pointercancel',endDrag);
 })();
 
 /* ---------- Welcome / tutorial ---------- */
